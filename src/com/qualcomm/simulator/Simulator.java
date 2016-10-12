@@ -1,14 +1,24 @@
 package com.qualcomm.simulator;
 
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+
 public class Simulator {
 
-//	private static OpMode opMode;
+	private static OpMode opMode;
 	
 	private static int targetFPS = 60;
-	private static int currentFPS = 0;
+	private static float currentFPS = 0;
+	
+	private enum State {
+		DISABLED,
+		INIT,
+		ENABLED
+	}
+	
+	private static State state = State.DISABLED;
 	
 	public static void main(String[] args) {
-//		opMode.init();
+		// create window and simulation graphics
 		
 		new Thread(loop()).start();
 	}
@@ -28,13 +38,13 @@ public class Simulator {
 					if (deltaTime >= 1000000000 / targetFPS) {
 						previousTime = currentTime;
 						fpsCount++;
-						update(deltaTime);
+						fixedUpdate();
 						
 						currentTime = System.nanoTime();
 						deltaSecond = currentTime - previousSecond;
 						
 						if (deltaSecond >= 1000000000) {
-							setCurrentFPS((int) (fpsCount / (deltaSecond / 1000000000)));
+							setCurrentFPS(fpsCount / (deltaSecond / 1000000000));
 							previousSecond = currentTime;
 							fpsCount = 0;
 						}
@@ -44,14 +54,54 @@ public class Simulator {
 		};
 	}
 
-	private static void update(long deltatime) {
+	private static void fixedUpdate() { // Update always advances (1 / targetFPS) of a second
 		// do world update
 		
-//		opMode.loop();
+		// update gamepads
+		
+		if (state == State.INIT) {
+			opMode.init_loop();
+			opMode.postInitLoop();
+		} else if (state == State.ENABLED) {
+			opMode.time += 1d / targetFPS;
+			opMode.loop();
+			opMode.postLoop();
+		}
 	}
 	
-	public static void setCurrentFPS(int fps) {
-		currentFPS = fps;
+	public static void setCurrentFPS(float fps) { currentFPS = fps; }
+	public static float getCurrentFPS() { return currentFPS; }
+	
+	public static State getState() { return state; }
+	
+	public static boolean init() {
+		if (state == State.DISABLED) {
+			state = State.INIT;
+			opMode.init();
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public static boolean start() {
+		if (state == State.INIT) {
+			state = State.ENABLED;
+			opMode.start();
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public static boolean stop() {
+		if (state != State.DISABLED) {
+			state = State.DISABLED;
+			opMode.stop();
+			return true;
+		}
+		
+		return false;
 	}
 	
 }
