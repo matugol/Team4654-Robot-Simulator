@@ -16,7 +16,7 @@ public abstract class OpMode {
 	public abstract void init();
 	public void start() {};
 	public abstract void loop();
-	public abstract void stop();
+	public void stop() {}
 	public void updateTelemetry(Telemetry telemetry) {	telemetry.update(); }
 	public void postInitLoop() { updateTelemetry(telemetry); }
 	public void postLoop() { updateTelemetry(telemetry); }

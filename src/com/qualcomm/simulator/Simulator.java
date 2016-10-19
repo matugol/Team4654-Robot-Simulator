@@ -1,10 +1,16 @@
 package com.qualcomm.simulator;
 
+import java.util.ArrayList;
+
+import com.qualcomm.ftcrobotcontroller.opmodes.ExampleOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 public class Simulator {
 
 	private static OpMode opMode;
+	private static ArrayList<Component> robot;
+	float robotX = 0, robotY = 0, robotRotation = 0;
+	private static ArrayList<SimMotor> leftWheels, rightWheels;
 	
 	private static int targetFPS = 60;
 	private static float currentFPS = 0;
@@ -19,8 +25,20 @@ public class Simulator {
 	
 	public static void main(String[] args) {
 		// create window and simulation graphics
-		
+		opMode = new ExampleOpMode();
+		createRobot();
 		new Thread(loop()).start();
+	}
+	
+	private static void createRobot() {
+		robot.add(new SimMotor(-.5f, .7f, 0f, "leftfront", opMode.hardwareMap));
+		leftWheels.add((SimMotor) robot.get(0));
+		robot.add(new SimMotor(.5f, .7f, 0f, "rightfront", opMode.hardwareMap));
+		rightWheels.add((SimMotor) robot.get(1));
+		robot.add(new SimMotor(-.5f, -.7f, 0f, "leftback", opMode.hardwareMap));
+		leftWheels.add((SimMotor) robot.get(2));
+		robot.add(new SimMotor(.5f, -.7f, 0f, "rightback", opMode.hardwareMap));
+		rightWheels.add((SimMotor) robot.get(3));
 	}
 	
 	private static Runnable loop() {
@@ -55,7 +73,7 @@ public class Simulator {
 	}
 
 	private static void fixedUpdate() { // Update always advances (1 / targetFPS) of a second
-		// do world update
+		worldUpdate();
 		
 		// update gamepads
 		
@@ -67,6 +85,21 @@ public class Simulator {
 			opMode.loop();
 			opMode.postLoop();
 		}
+	}
+	
+	private static void worldUpdate() {
+		float leftAverage = 0f;
+		for (SimMotor motor : leftWheels) {
+			leftAverage += motor.getPower();
+		}
+		leftAverage /= leftWheels.size();
+		float rightAverage = 0f;
+		for (SimMotor motor : rightWheels) {
+			rightAverage += motor.getPower();
+		}
+		rightAverage /= rightWheels.size();
+		
+		// TODO Movement calculations
 	}
 	
 	public static void setCurrentFPS(float fps) { currentFPS = fps; }
