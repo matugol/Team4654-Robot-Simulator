@@ -1,6 +1,7 @@
 package com.qualcomm.simulator;
 
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
 public class Frame implements Component {
@@ -18,6 +19,9 @@ public class Frame implements Component {
 		this.rotation = rotation;
 		
 		image = new BufferedImage(Math.round(width * Window.scale), Math.round(width * Window.scale), BufferedImage.TYPE_INT_ARGB_PRE);
+		Graphics2D g = image.createGraphics();
+		g.setColor(color);
+		g.fillRect(0, 0, Math.round(width * Window.scale), Math.round(height * Window.scale));
 	}
 
 	@Override

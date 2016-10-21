@@ -35,8 +35,8 @@ public class Window extends JFrame {
 		    BufferedImage robot = new BufferedImage(18 * scale, 18 * scale, BufferedImage.TYPE_INT_ARGB_PRE);
 		    Graphics2D robotG = robot.createGraphics();
 		    for (Component c : Simulator.getRobot()) {
-		    	AffineTransform trans = AffineTransform.getTranslateInstance((c.getX() + 9f - c.getImage().getWidth() / scale / 2) * scale, (c.getY() + 9f - c.getImage().getHeight() / scale / 2) * scale);
-		    	trans.rotate(Math.toRadians(-c.getRotation()), c.getImage().getWidth() / 2, c.getImage().getHeight() / 2);
+		    	AffineTransform trans = AffineTransform.getTranslateInstance((c.getX() + 9f - c.getImage().getWidth() / scale / 2f) * scale, (c.getY() + 9f - c.getImage().getHeight() / scale / 2f) * scale);
+		    	trans.rotate(Math.toRadians(-c.getRotation()), c.getImage().getWidth() / 2f, c.getImage().getHeight() / 2f);
 		    	robotG.drawImage(c.getImage(), trans, null);
 		    }
 		    
@@ -44,7 +44,7 @@ public class Window extends JFrame {
 		    robotG.drawLine(13 * scale, 18 * scale, 9 * scale, 0);
 		    
 		    AffineTransform trans = AffineTransform.getTranslateInstance(Simulator.getRobotX() * scale, Simulator.getRobotY() * scale);
-		    trans.rotate(Math.toRadians(-Simulator.getRobotRotation() + 90), robot.getWidth() / 2, robot.getHeight() / 2);
+		    trans.rotate(Math.toRadians(-Simulator.getRobotRotation() + 90), robot.getWidth() / 2f, robot.getHeight() / 2f);
 		    gg.drawImage(robot, trans, null);
 		}
 		
