@@ -18,9 +18,9 @@ public class SimMotor implements Component, DcMotor {
 	private int maxSpeed;
 	private RunMode runMode;
 	private ZeroPowerBehavior zeroPowerBehavior;
-	private double power;
+	private double power = 1f;
 	private Direction direction;
-	
+
 	private BufferedImage image;
 	private static final float width = 3, height = 1;
 	
