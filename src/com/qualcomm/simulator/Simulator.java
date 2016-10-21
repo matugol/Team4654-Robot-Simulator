@@ -4,16 +4,20 @@ import java.util.ArrayList;
 
 import com.qualcomm.ftcrobotcontroller.opmodes.ExampleOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.sun.java.swing.plaf.windows.resources.windows;
 
 public class Simulator {
 
 	private static OpMode opMode;
-	private static ArrayList<Component> robot;
-	float robotX = 0, robotY = 0, robotRotation = 0;
-	private static ArrayList<SimMotor> leftWheels, rightWheels;
+	private static ArrayList<Component> robot = new ArrayList<Component>();
+	private static float robotX = 72, robotY = 72, robotRotation = 90;
+	private static ArrayList<SimMotor> leftWheels = new ArrayList<SimMotor>(), rightWheels = new ArrayList<SimMotor>();
 	
 	private static int targetFPS = 60;
 	private static float currentFPS = 0;
+	
+	private static Window window = new Window();
 	
 	private enum State {
 		DISABLED,
@@ -26,18 +30,20 @@ public class Simulator {
 	public static void main(String[] args) {
 		// create window and simulation graphics
 		opMode = new ExampleOpMode();
+		window.repaint();
+		opMode.hardwareMap = new HardwareMap();
 		createRobot();
 		new Thread(loop()).start();
 	}
 	
 	private static void createRobot() {
-		robot.add(new SimMotor(-.5f, .7f, 0f, "leftfront", opMode.hardwareMap));
+		robot.add(new SimMotor(-7f, 7f, 0f, "leftfront", opMode.hardwareMap));
 		leftWheels.add((SimMotor) robot.get(0));
-		robot.add(new SimMotor(.5f, .7f, 0f, "rightfront", opMode.hardwareMap));
+		robot.add(new SimMotor(7f, 7f, 180f, "rightfront", opMode.hardwareMap));
 		rightWheels.add((SimMotor) robot.get(1));
-		robot.add(new SimMotor(-.5f, -.7f, 0f, "leftback", opMode.hardwareMap));
+		robot.add(new SimMotor(-7f, -7f, 0f, "leftback", opMode.hardwareMap));
 		leftWheels.add((SimMotor) robot.get(2));
-		robot.add(new SimMotor(.5f, -.7f, 0f, "rightback", opMode.hardwareMap));
+		robot.add(new SimMotor(7f, -7f, 180f, "rightback", opMode.hardwareMap));
 		rightWheels.add((SimMotor) robot.get(3));
 	}
 	
@@ -136,5 +142,10 @@ public class Simulator {
 		
 		return false;
 	}
+	
+	public static ArrayList<Component> getRobot() { return robot; }
+	public static float getRobotX() { return robotX; }
+	public static float getRobotY() { return robotY; }
+	public static float getRobotRotation() { return robotRotation; }
 	
 }

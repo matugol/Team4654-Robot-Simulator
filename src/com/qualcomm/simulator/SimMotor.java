@@ -1,5 +1,8 @@
 package com.qualcomm.simulator;
 
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -18,18 +21,23 @@ public class SimMotor implements Component, DcMotor {
 	private double power;
 	private Direction direction;
 	
+	private BufferedImage image;
+	private static final float width = 3, height = 1;
+	
 	public SimMotor(float x, float y, float rotation, String name, HardwareMap map) {
 		this.x = x;
 		this.y = y;
 		this.rotation = rotation;
 		map.dcMotor.put(name, this);
+		
+		image = new BufferedImage(Math.round(width * Window.scale), Math.round(height * Window.scale), BufferedImage.TYPE_INT_ARGB_PRE);
+		Graphics2D g = image.createGraphics();
+		g.setColor(Color.DARK_GRAY);
+		g.fillRect(0, 0, Math.round(width * Window.scale), Math.round(height * Window.scale));
 	}
 	
 	@Override
-	public BufferedImage getImage() {
-		// TODO Return motor image
-		return null;
-	}
+	public BufferedImage getImage() { return image;	}
 	
 	@Override
 	public float getX() { return x; }
