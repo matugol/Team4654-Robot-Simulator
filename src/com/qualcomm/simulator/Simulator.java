@@ -1,5 +1,6 @@
 package com.qualcomm.simulator;
 
+import java.awt.Color;
 import java.util.ArrayList;
 
 import com.qualcomm.ftcrobotcontroller.opmodes.ExampleOpMode;
@@ -36,15 +37,17 @@ public class Simulator {
 		new Thread(loop()).start();
 	}
 
-	private static void createRobot() {
+	private static void createRobot() {		
+		robot.add(new Frame(Color.LIGHT_GRAY, 0f, 0f, 18f, 18f, 0f));
+
 		robot.add(new SimMotor(-7f, 7f, 0f, "leftfront", opMode.hardwareMap));
-		leftWheels.add((SimMotor) robot.get(0));
+		leftWheels.add((SimMotor) robot.get(1));
 		robot.add(new SimMotor(7f, 7f, 180f, "rightfront", opMode.hardwareMap));
-		rightWheels.add((SimMotor) robot.get(1));
+		rightWheels.add((SimMotor) robot.get(2));
 		robot.add(new SimMotor(-7f, -7f, 0f, "leftback", opMode.hardwareMap));
-		leftWheels.add((SimMotor) robot.get(2));
+		leftWheels.add((SimMotor) robot.get(3));
 		robot.add(new SimMotor(7f, -7f, 180f, "rightback", opMode.hardwareMap));
-		rightWheels.add((SimMotor) robot.get(3));
+		rightWheels.add((SimMotor) robot.get(4));		
 	}
 
 	private static Runnable loop() {
