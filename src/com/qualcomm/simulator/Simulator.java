@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import com.qualcomm.ftcrobotcontroller.opmodes.ExampleOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.sun.java.swing.plaf.windows.resources.windows;
 
 public class Simulator {
 
@@ -20,14 +19,12 @@ public class Simulator {
 	private static Window window = new Window();
 
 	private enum State {
-		DISABLED,
-		INIT,
-		ENABLED
+		DISABLED, INIT, ENABLED
 	}
 
 	private static State state = State.DISABLED;
 
-	public static void main(String[] args) {
+	public static void main(final String[] args) {
 		// create window and simulation graphics
 		opMode = new ExampleOpMode();
 		window.repaint();
@@ -48,30 +45,26 @@ public class Simulator {
 	}
 
 	private static Runnable loop() {
-		return new Runnable() {
+		return () -> {
+			long deltaTime, currentTime, previousTime = System.nanoTime(), deltaSecond, previousSecond = System.nanoTime();
+			int fpsCount = 0;
 
-			@Override
-			public void run() {			
-				long deltaTime, currentTime, previousTime = System.nanoTime(), deltaSecond, previousSecond = System.nanoTime();
-				int fpsCount = 0;
+			while (true) {
+				currentTime = System.nanoTime();
+				deltaTime = currentTime - previousTime;
 
-				while (true) {
+				if (deltaTime >= 1000000000 / targetFPS) {
+					previousTime = currentTime;
+					fpsCount++;
+					fixedUpdate();
+
 					currentTime = System.nanoTime();
-					deltaTime = currentTime - previousTime;
+					deltaSecond = currentTime - previousSecond;
 
-					if (deltaTime >= 1000000000 / targetFPS) {
-						previousTime = currentTime;
-						fpsCount++;
-						fixedUpdate();
-
-						currentTime = System.nanoTime();
-						deltaSecond = currentTime - previousSecond;
-
-						if (deltaSecond >= 1000000000) {
-							setCurrentFPS(fpsCount / (deltaSecond / 1000000000));
-							previousSecond = currentTime;
-							fpsCount = 0;
-						}
+					if (deltaSecond >= 1000000000) {
+						setCurrentFPS(fpsCount / (deltaSecond / 1000000000));
+						previousSecond = currentTime;
+						fpsCount = 0;
 					}
 				}
 			}
@@ -91,39 +84,46 @@ public class Simulator {
 			opMode.loop();
 			opMode.postLoop();
 		}
-		
+
 		robotRotation += 0.42f;
-		
+
 		window.repaint();
 	}
 
-	private static void worldUpdate(double timeStep) {
+	private static void worldUpdate(final double timeStep) {
 		float leftAverage = 0f;
-		for (SimMotor motor : leftWheels) {
+		for (final SimMotor motor : leftWheels) {
 			leftAverage += motor.getPower();
 		}
-		//leftAverage /= leftWheels.size();
+		// leftAverage /= leftWheels.size();
 		float rightAverage = 0f;
-		for (SimMotor motor : rightWheels) {
+		for (final SimMotor motor : rightWheels) {
 			rightAverage += motor.getPower();
 		}
-		//rightAverage /= rightWheels.size();
+		// rightAverage /= rightWheels.size();
 
 		// TODO Movement calculations
 		robotRotation += (leftAverage - rightAverage) * 5.4f;
 		if (robotRotation >= 360f) robotRotation -= 360f;
 		if (robotRotation < 0f) robotRotation += 360;
-		
-		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 5f * timeStep);
+
+		final float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 5f * timeStep);
 		robotX += (float) (distance * Math.cos(Math.toRadians(robotRotation)));
 		robotY -= (float) (distance * Math.sin(Math.toRadians(robotRotation)));
-		
+
 	}
 
-	public static void setCurrentFPS(float fps) { currentFPS = fps; }
-	public static float getCurrentFPS() { return currentFPS; }
+	public static void setCurrentFPS(final float fps) {
+		currentFPS = fps;
+	}
 
-	public static State getState() { return state; }
+	public static float getCurrentFPS() {
+		return currentFPS;
+	}
+
+	public static State getState() {
+		return state;
+	}
 
 	public static boolean init() {
 		if (state == State.DISABLED) {
@@ -155,9 +155,20 @@ public class Simulator {
 		return false;
 	}
 
-	public static ArrayList<Component> getRobot() { return robot; }
-	public static float getRobotX() { return robotX; }
-	public static float getRobotY() { return robotY; }
-	public static float getRobotRotation() { return robotRotation; }
+	public static ArrayList<Component> getRobot() {
+		return robot;
+	}
+
+	public static float getRobotX() {
+		return robotX;
+	}
+
+	public static float getRobotY() {
+		return robotY;
+	}
+
+	public static float getRobotRotation() {
+		return robotRotation;
+	}
 
 }

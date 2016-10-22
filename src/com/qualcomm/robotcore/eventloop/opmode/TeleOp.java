@@ -1,25 +1,25 @@
 /*
  * Copyright (c) 2015 Robert Atkinson
- *
- *    Ported from the Swerve library by Craig MacFarlane
- *    Based upon contributions and original idea by dmssargent.
- *
+ * 
+ * Ported from the Swerve library by Craig MacFarlane
+ * Based upon contributions and original idea by dmssargent.
+ * 
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
  * (subject to the limitations in the disclaimer below) provided that the following conditions are
  * met:
- *
+ * 
  * Redistributions of source code must retain the above copyright notice, this list of conditions
  * and the following disclaimer.
- *
+ * 
  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
  * and the following disclaimer in the documentation and/or other materials provided with the
  * distribution.
- *
+ * 
  * Neither the name of Robert Atkinson, Craig MacFarlane nor the names of its contributors may be used to
  * endorse or promote products derived from this software without specific prior written permission.
- *
+ * 
  * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
  * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -32,11 +32,15 @@
  */
 package com.qualcomm.robotcore.eventloop.opmode;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * Provides an easy and non-centralized way of determining the OpMode list
- * shown on an FTC Driver Station.  Put an {@link TeleOp} annotation on
+ * shown on an FTC Driver Station. Put an {@link TeleOp} annotation on
  * your teleop OpModes that you want to show up in the driver station display.
  *
  * If you want to temporarily disable an opmode from showing up, then set then also add
@@ -48,19 +52,20 @@ import java.lang.annotation.*;
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface TeleOp
-    {
-    /**
-     * The name to be used on the driver station display. If empty, the name of
-     * the OpMode class will be used.
-     * @return the name to use for the OpMode on the driver station
-     */
-    String name() default "";
+public @interface TeleOp {
+	/**
+	 * The name to be used on the driver station display. If empty, the name of
+	 * the OpMode class will be used.
+	 * 
+	 * @return the name to use for the OpMode on the driver station
+	 */
+	String name() default "";
 
-    /**
-     * Optionally indicates a group of other OpModes with which the annotated
-     * OpMode should be sorted on the driver station OpMode list.
-     * @return the group into which the annotated OpMode is to be categorized
-     */
-    String group() default "";
-    }
+	/**
+	 * Optionally indicates a group of other OpModes with which the annotated
+	 * OpMode should be sorted on the driver station OpMode list.
+	 * 
+	 * @return the group into which the annotated OpMode is to be categorized
+	 */
+	String group() default "";
+}

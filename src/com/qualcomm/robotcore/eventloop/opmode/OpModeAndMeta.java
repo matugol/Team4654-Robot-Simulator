@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2016 Robert Atkinson
  *
- *    Ported from the Swerve library by Craig MacFarlane
- *    Based upon contributions and original idea by dmssargent.
+ * Ported from the Swerve library by Craig MacFarlane
+ * Based upon contributions and original idea by dmssargent.
  *
  * All rights reserved.
  *
@@ -36,14 +36,12 @@ package com.qualcomm.robotcore.eventloop.opmode;
 /**
  * {@link OpModeAndMeta} ties together an OpMode class with metadata concerning same.
  */
-public class OpModeAndMeta
-    {
-    public final OpModeMeta meta;
-    public final Class<OpMode> clazz;
+public class OpModeAndMeta {
+	public final OpModeMeta meta;
+	public final Class<? extends OpMode> clazz;
 
-    public OpModeAndMeta(OpModeMeta meta, Class<OpMode> clazz)
-        {
-        this.meta = meta;
-        this.clazz = clazz;
-        }
-    }
+	public OpModeAndMeta(final OpModeMeta meta, final Class<? extends OpMode> clazz) {
+		this.meta = meta;
+		this.clazz = clazz;
+	}
+}

@@ -35,110 +35,114 @@ package com.qualcomm.robotcore.hardware;
  * <p>
  * Different DC motor controllers will implement this interface.
  */
-@SuppressWarnings("unused")
 public interface DcMotorController extends HardwareDevice {
 
-  /**
-   * Set the current motor mode. {@link DcMotor.RunMode}
-   *
-   * @param motor port of motor
-   * @param mode run mode
-   */
-  void setMotorMode(int motor, DcMotor.RunMode mode);
+	/**
+	 * Set the current motor mode. {@link DcMotor.RunMode}
+	 *
+	 * @param motor port of motor
+	 * @param mode run mode
+	 */
+	void setMotorMode(int motor, DcMotor.RunMode mode);
 
-  /**
-   * Get the current motor mode. Returns the current "run mode".
-   *
-   * @param motor port of motor
-   * @return run mode
-   */
-  DcMotor.RunMode getMotorMode(int motor);
+	/**
+	 * Get the current motor mode. Returns the current "run mode".
+	 *
+	 * @param motor port of motor
+	 * @return run mode
+	 */
+	DcMotor.RunMode getMotorMode(int motor);
 
-  /**
-   * Set the current motor power
-   *
-   * @param motor port of motor
-   * @param power from -1.0 to 1.0
-   */
-  void setMotorPower(int motor, double power);
+	/**
+	 * Set the current motor power
+	 *
+	 * @param motor port of motor
+	 * @param power from -1.0 to 1.0
+	 */
+	void setMotorPower(int motor, double power);
 
-  /**
-   * Get the current motor power
-   *
-   * @param motor port of motor
-   * @return scaled from -1.0 to 1.0
-   */
-  double getMotorPower(int motor);
+	/**
+	 * Get the current motor power
+	 *
+	 * @param motor port of motor
+	 * @return scaled from -1.0 to 1.0
+	 */
+	double getMotorPower(int motor);
 
-  /**
-   * Sets the maximum targetable motor speed when the indicated motor is running in one of the
-   * PID motor modes.
-   * @param motor                 the motor in question
-   * @param encoderTicksPerSecond the new maximum targetable motor speed, in units of encoder
-   *                              ticks per second
-   * @see DcMotor#setMaxSpeed(int)
-   */
-   void setMotorMaxSpeed(int motor, int encoderTicksPerSecond);
+	/**
+	 * Sets the maximum targetable motor speed when the indicated motor is running in one of the
+	 * PID motor modes.
+	 *
+	 * @param motor the motor in question
+	 * @param encoderTicksPerSecond the new maximum targetable motor speed, in units of encoder
+	 *            ticks per second
+	 * @see DcMotor#setMaxSpeed(int)
+	 */
+	void setMotorMaxSpeed(int motor, int encoderTicksPerSecond);
 
-  /**
-   * Returns the current maximum targetable motor speed when the indicated motor is running
-   * in one of the PID modes
-   * @param motor the motor in question
-   * @return the current maximum targetable speed of that motor, in units of encoder ticks per second
-   * @see DcMotor#getMaxSpeed()
-   */
-   int getMotorMaxSpeed(int motor);
+	/**
+	 * Returns the current maximum targetable motor speed when the indicated motor is running
+	 * in one of the PID modes
+	 *
+	 * @param motor the motor in question
+	 * @return the current maximum targetable speed of that motor, in units of encoder ticks per second
+	 * @see DcMotor#getMaxSpeed()
+	 */
+	int getMotorMaxSpeed(int motor);
 
-  /**
-   * Is the motor busy?
-   *
-   * @param motor port of motor
-   * @return true if the motor is busy
-   */
-  boolean isBusy(int motor);
+	/**
+	 * Is the motor busy?
+	 *
+	 * @param motor port of motor
+	 * @return true if the motor is busy
+	 */
+	boolean isBusy(int motor);
 
-  /**
-   * Sets the behavior of the motor when zero power is applied.
-   * @param zeroPowerBehavior the behavior of the motor when zero power is applied.
-   */
-  void setMotorZeroPowerBehavior(int motor, DcMotor.ZeroPowerBehavior zeroPowerBehavior);
+	/**
+	 * Sets the behavior of the motor when zero power is applied.
+	 *
+	 * @param zeroPowerBehavior the behavior of the motor when zero power is applied.
+	 */
+	void setMotorZeroPowerBehavior(int motor, DcMotor.ZeroPowerBehavior zeroPowerBehavior);
 
-  /**
-   * Returns the current zero power behavior of the motor.
-   * @return the current zero power behavior of the motor.
-   */
-  DcMotor.ZeroPowerBehavior getMotorZeroPowerBehavior(int motor);
+	/**
+	 * Returns the current zero power behavior of the motor.
+	 *
+	 * @return the current zero power behavior of the motor.
+	 */
+	DcMotor.ZeroPowerBehavior getMotorZeroPowerBehavior(int motor);
 
-  /**
-   * Is motor power set to float?
-   *
-   * @param motor port of motor
-   * @return true of motor is set to float
-   */
-  boolean getMotorPowerFloat(int motor);
+	/**
+	 * Is motor power set to float?
+	 *
+	 * @param motor port of motor
+	 * @return true of motor is set to float
+	 */
+	boolean getMotorPowerFloat(int motor);
 
-  /**
-   * Set the motor target position. This takes in an integer, which is not scaled.
-   *
-   * Motor power should be positive if using run to position
-   *  @param motor port of motor
-   * @param position range from Integer.MIN_VALUE to Integer.MAX_VALUE
-   */
-  void setMotorTargetPosition(int motor, int position);
+	/**
+	 * Set the motor target position. This takes in an integer, which is not scaled.
+	 *
+	 * Motor power should be positive if using run to position
+	 *
+	 * @param motor port of motor
+	 * @param position range from Integer.MIN_VALUE to Integer.MAX_VALUE
+	 */
+	void setMotorTargetPosition(int motor, int position);
 
-  /**
-   * Get the current motor target position
-   *
-   * @param motor port of motor
-   * @return integer, unscaled
-   */
-  int getMotorTargetPosition(int motor);
+	/**
+	 * Get the current motor target position
+	 *
+	 * @param motor port of motor
+	 * @return integer, unscaled
+	 */
+	int getMotorTargetPosition(int motor);
 
-  /**
-   * Get the current motor position
-   *
-   * @param motor port of motor
-   * @return integer, unscaled
-   */
-  int getMotorCurrentPosition(int motor);
+	/**
+	 * Get the current motor position
+	 *
+	 * @param motor port of motor
+	 * @return integer, unscaled
+	 */
+	int getMotorCurrentPosition(int motor);
 }

@@ -1,22 +1,22 @@
 /*
  * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
  * (subject to the limitations in the disclaimer below) provided that the following conditions are
  * met:
- *
+ * 
  * Redistributions of source code must retain the above copyright notice, this list of conditions
  * and the following disclaimer.
- *
+ * 
  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
  * and the following disclaimer in the documentation and/or other materials provided with the
  * distribution.
- *
+ * 
  * Neither the name of Qualcomm Technologies Inc nor the names of its contributors may be used to
  * endorse or promote products derived from this software without specific prior written permission.
- *
+ * 
  * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
  * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -55,47 +55,53 @@ package com.qualcomm.robotcore.hardware;
  */
 public interface LegacyModule extends HardwareDevice, I2cController {
 
-  /**
-   * Enable a physical port in analog read mode
-   * @param physicalPort physical port number on the device
-   */
-  void enableAnalogReadMode(int physicalPort);
+	/**
+	 * Enable a physical port in analog read mode
+	 * 
+	 * @param physicalPort physical port number on the device
+	 */
+	void enableAnalogReadMode(int physicalPort);
 
-  /**
-   * Read an analog value from a device; only works in analog read mode
-   * @param physicalPort physical port number on the device
-   * @return byte[] containing the two analog values; low byte first, high byte second
-   */
-  byte[] readAnalogRaw(int physicalPort);
+	/**
+	 * Read an analog value from a device; only works in analog read mode
+	 * 
+	 * @param physicalPort physical port number on the device
+	 * @return byte[] containing the two analog values; low byte first, high byte second
+	 */
+	byte[] readAnalogRaw(int physicalPort);
 
-  /**
-   * Reads the analog voltage from a device. The port indicated must currently
-   * be in analog read mode.
-   * @param physicalPort the port whose voltage is to be read
-   * @return the voltage level read, in volts
-   */
-  double readAnalogVoltage(int physicalPort);
+	/**
+	 * Reads the analog voltage from a device. The port indicated must currently
+	 * be in analog read mode.
+	 * 
+	 * @param physicalPort the port whose voltage is to be read
+	 * @return the voltage level read, in volts
+	 */
+	double readAnalogVoltage(int physicalPort);
 
-  /**
-   * Returns the maximum voltage that can be read by our analog inputs
-   * @return the maximum voltage that can be read by our analog inputs
-   */
-  double getMaxAnalogInputVoltage();
+	/**
+	 * Returns the maximum voltage that can be read by our analog inputs
+	 * 
+	 * @return the maximum voltage that can be read by our analog inputs
+	 */
+	double getMaxAnalogInputVoltage();
 
-  /**
-   * Enable or disable 9V power on a port
-   * @param physicalPort physical port number on the device
-   * @param enable true to enable; false to disable
-   */
-  void enable9v(int physicalPort, boolean enable);
+	/**
+	 * Enable or disable 9V power on a port
+	 * 
+	 * @param physicalPort physical port number on the device
+	 * @param enable true to enable; false to disable
+	 */
+	void enable9v(int physicalPort, boolean enable);
 
-  /**
-   * Set the value of digital line 0 or 1 while in analog mode.
-   * <p>
-   * These are port pins 5 and 6.
-   * @param physicalPort physical port number on the device
-   * @param line line 0 or 1
-   * @param set true to set; otherwise false
-   */
-  void setDigitalLine(int physicalPort, int line, boolean set);
+	/**
+	 * Set the value of digital line 0 or 1 while in analog mode.
+	 * <p>
+	 * These are port pins 5 and 6.
+	 * 
+	 * @param physicalPort physical port number on the device
+	 * @param line line 0 or 1
+	 * @param set true to set; otherwise false
+	 */
+	void setDigitalLine(int physicalPort, int line, boolean set);
 }

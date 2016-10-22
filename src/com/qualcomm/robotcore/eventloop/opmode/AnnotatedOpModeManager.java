@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2015 Robert Atkinson
  *
- *    Ported from the Swerve library by Craig MacFarlane
- *    Based upon contributions and original idea by dmssargent.
+ * Ported from the Swerve library by Craig MacFarlane
+ * Based upon contributions and original idea by dmssargent.
  *
  * All rights reserved.
  *
@@ -39,20 +39,19 @@ package com.qualcomm.robotcore.eventloop.opmode;
  * @see OpModeManager
  * @see OpModeRegistrar
  */
-public interface AnnotatedOpModeManager extends OpModeManager
-    {
-    /**
-     * Register a class for display on the driver station and availability for game play.
-     * New instances of this class will be created as needed. The name used on the driver
-     * station menu is taken from a {@link TeleOp} or {@link Autonomous} annotation on the
-     * class itself (any {@link Disabled} attribute which may also be present is ignored).
-     * If the class lacks both a {@link TeleOp} and a {@link Autonomous} annotation, then
-     * no registration takes place.
-     *
-     * @param opModeClass   the class of the OpMode to create
-     * @see TeleOp
-     * @see Autonomous
-     * @see #register(String, Class)
-     */
-    void register(Class opModeClass);
-    }
+public interface AnnotatedOpModeManager extends OpModeManager {
+	/**
+	 * Register a class for display on the driver station and availability for game play.
+	 * New instances of this class will be created as needed. The name used on the driver
+	 * station menu is taken from a {@link TeleOp} or {@link Autonomous} annotation on the
+	 * class itself (any {@link Disabled} attribute which may also be present is ignored).
+	 * If the class lacks both a {@link TeleOp} and a {@link Autonomous} annotation, then
+	 * no registration takes place.
+	 *
+	 * @param opModeClass the class of the OpMode to create
+	 * @see TeleOp
+	 * @see Autonomous
+	 * @see #register(String, Class)
+	 */
+	void register(Class<?> opModeClass);
+}

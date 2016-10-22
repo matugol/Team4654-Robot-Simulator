@@ -5,19 +5,19 @@ import java.awt.image.BufferedImage;
 
 public class Frame implements Component {
 
-	private Color color;
-	private float x, y, width, height, rotation;
-	private BufferedImage image;
-	
-	public Frame(Color color, float x, float y, float width, float height, float rotation) {
+	private final Color color;
+	private final float x, y, width, height, rotation;
+	private final BufferedImage image;
+
+	public Frame(final Color color, final float x, final float y, final float width, final float height, final float rotation) {
 		this.color = color;
 		this.x = x;
 		this.y = y;
 		this.width = width;
 		this.height = height;
 		this.rotation = rotation;
-		
-		image = new BufferedImage(Math.round(width * Window.scale), Math.round(width * Window.scale), BufferedImage.TYPE_INT_ARGB_PRE);
+
+		image = new BufferedImage(Math.round(width * Window.SCALE), Math.round(width * Window.SCALE), BufferedImage.TYPE_INT_ARGB_PRE);
 	}
 
 	@Override
@@ -39,5 +39,5 @@ public class Frame implements Component {
 	public float getRotation() {
 		return rotation;
 	}
-	
+
 }

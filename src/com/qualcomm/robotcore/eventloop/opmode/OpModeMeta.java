@@ -1,25 +1,25 @@
 /*
  * Copyright (c) 2016 Robert Atkinson
- *
- *    Ported from the Swerve library by Craig MacFarlane
- *    Based upon contributions and original idea by dmssargent.
- *
+ * 
+ * Ported from the Swerve library by Craig MacFarlane
+ * Based upon contributions and original idea by dmssargent.
+ * 
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
  * (subject to the limitations in the disclaimer below) provided that the following conditions are
  * met:
- *
+ * 
  * Redistributions of source code must retain the above copyright notice, this list of conditions
  * and the following disclaimer.
- *
+ * 
  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
  * and the following disclaimer in the documentation and/or other materials provided with the
  * distribution.
- *
+ * 
  * Neither the name of Robert Atkinson nor the names of his contributors may be used to
  * endorse or promote products derived from this software without specific prior written permission.
- *
+ * 
  * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
  * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -33,93 +33,89 @@
 
 package com.qualcomm.robotcore.eventloop.opmode;
 
-import android.support.annotation.NonNull;
 
 /**
  * {@link OpModeMeta} provides information about an OpMode.
  */
-public class OpModeMeta
-    {
-    //----------------------------------------------------------------------------------------------
-    // Types and constants
-    //----------------------------------------------------------------------------------------------
+public class OpModeMeta {
+	// ----------------------------------------------------------------------------------------------
+	// Types and constants
+	// ----------------------------------------------------------------------------------------------
 
-    public enum Flavor { AUTONOMOUS, TELEOP }
+	public enum Flavor {
+		AUTONOMOUS, TELEOP
+	}
 
-    // arbitrary, but unlikely to be used by users. Sorts early
-    public static final String DefaultGroup = "$$$$$$$";
+	// arbitrary, but unlikely to be used by users. Sorts early
+	public static final String DefaultGroup = "$$$$$$$";
 
-    //----------------------------------------------------------------------------------------------
-    // State
-    //----------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------
+	// State
+	// ----------------------------------------------------------------------------------------------
 
-    public final @NonNull Flavor flavor;
-    public final @NonNull String group;
-    public final @NonNull String name;
+	public final @NonNull Flavor flavor;
+	public final @NonNull String group;
+	public final @NonNull String name;
 
-    //----------------------------------------------------------------------------------------------
-    // Construction
-    //----------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------
+	// Construction
+	// ----------------------------------------------------------------------------------------------
 
-    public OpModeMeta()
-        {
-        this("");
-        }
-    public OpModeMeta(@NonNull String name)
-        {
-        this(name, Flavor.TELEOP);
-        }
-    public OpModeMeta(@NonNull String name, @NonNull Flavor flavor)
-        {
-        this(name, flavor, DefaultGroup);
-        }
-    public OpModeMeta(@NonNull Flavor flavor, @NonNull String group)
-        {
-        this("", flavor, group);
-        }
-    public OpModeMeta(@NonNull String name, @NonNull Flavor flavor, @NonNull String group)
-        {
-        this.name = name;
-        this.flavor = flavor;
-        this.group = group;
-        }
+	public OpModeMeta() {
+		this("");
+	}
 
-    public static OpModeMeta forName(@NonNull String name, @NonNull OpModeMeta base)
-        {
-        return new OpModeMeta(name, base.flavor, base.group);
-        }
-    public static OpModeMeta forGroup(@NonNull String group, @NonNull OpModeMeta base)
-        {
-        return new OpModeMeta(base.name, base.flavor, group);
-        }
+	public OpModeMeta(@NonNull final String name) {
+		this(name, Flavor.TELEOP);
+	}
 
-    //----------------------------------------------------------------------------------------------
-    // Formatting
-    //----------------------------------------------------------------------------------------------
+	public OpModeMeta(@NonNull final String name, @NonNull final Flavor flavor) {
+		this(name, flavor, DefaultGroup);
+	}
 
-    // Format as name for convenient use in dialogs
-    @Override public String toString()
-        {
-        return this.name;
-        }
+	public OpModeMeta(@NonNull final Flavor flavor, @NonNull final String group) {
+		this("", flavor, group);
+	}
 
-    //----------------------------------------------------------------------------------------------
-    // Comparison
-    //----------------------------------------------------------------------------------------------
+	public OpModeMeta(@NonNull final String name, @NonNull final Flavor flavor, @NonNull final String group) {
+		this.name = name;
+		this.flavor = flavor;
+		this.group = group;
+	}
 
-    // Equate only by name for convenient use in legacy code here
-    @Override public boolean equals(Object o)
-        {
-        if (o instanceof OpModeMeta)
-            {
-            return this.name.equals(((OpModeMeta)o).name);
-            }
-        else
-            return false;
-        }
+	public static OpModeMeta forName(@NonNull final String name, @NonNull final OpModeMeta base) {
+		return new OpModeMeta(name, base.flavor, base.group);
+	}
 
-    @Override public int hashCode()
-        {
-        return this.name.hashCode();
-        }
-    }
+	public static OpModeMeta forGroup(@NonNull final String group, @NonNull final OpModeMeta base) {
+		return new OpModeMeta(base.name, base.flavor, group);
+	}
+
+	// ----------------------------------------------------------------------------------------------
+	// Formatting
+	// ----------------------------------------------------------------------------------------------
+
+	// Format as name for convenient use in dialogs
+	@Override
+	public String toString() {
+		return name;
+	}
+
+	// ----------------------------------------------------------------------------------------------
+	// Comparison
+	// ----------------------------------------------------------------------------------------------
+
+	// Equate only by name for convenient use in legacy code here
+	@Override
+	public boolean equals(final Object o) {
+		if (o instanceof OpModeMeta) {
+			return name.equals(((OpModeMeta) o).name);
+		} else
+			return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return name.hashCode();
+	}
+}

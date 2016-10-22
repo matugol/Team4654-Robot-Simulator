@@ -6,139 +6,124 @@ import com.qualcomm.robotcore.util.Range;
  * ContinuousRotationServoImpl provides an implementation of continuous
  * rotation servo functionality
  */
-public class CRServoImpl implements CRServo
-    {
-    //----------------------------------------------------------------------------------------------
-    // State
-    //----------------------------------------------------------------------------------------------
+public class CRServoImpl implements CRServo {
+	// ----------------------------------------------------------------------------------------------
+	// State
+	// ----------------------------------------------------------------------------------------------
 
-    protected ServoController controller    = null;
-    protected int             portNumber    = -1;
-    protected Direction       direction     = Direction.FORWARD;
+	protected ServoController controller = null;
+	protected int portNumber = -1;
+	protected Direction direction = Direction.FORWARD;
 
-    protected static final double apiPowerMin = -1.0;
-    protected static final double apiPowerMax =  1.0;
-    protected static final double apiServoPositionMin = 0.0;
-    protected static final double apiServoPositionMax = 1.0;
+	protected static final double apiPowerMin = -1.0;
+	protected static final double apiPowerMax = 1.0;
+	protected static final double apiServoPositionMin = 0.0;
+	protected static final double apiServoPositionMax = 1.0;
 
-    //------------------------------------------------------------------------------------------------
-    // Construction
-    //------------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------------------------------------------
+	// Construction
+	// ------------------------------------------------------------------------------------------------
 
-    /**
-     * Constructor
-     *
-     * @param controller Servo controller that this servo is attached to
-     * @param portNumber physical port number on the servo controller
-     */
-    public CRServoImpl(ServoController controller, int portNumber)
-        {
-        this(controller, portNumber, Direction.FORWARD);
-        }
+	/**
+	 * Constructor
+	 *
+	 * @param controller Servo controller that this servo is attached to
+	 * @param portNumber physical port number on the servo controller
+	 */
+	public CRServoImpl(final ServoController controller, final int portNumber) {
+		this(controller, portNumber, Direction.FORWARD);
+	}
 
-    /**
-     * Constructor
-     *
-     * @param controller Servo controller that this servo is attached to
-     * @param portNumber physical port number on the servo controller
-     * @param direction  FORWARD for normal operation, REVERSE to reverse operation
-     */
-    public CRServoImpl(ServoController controller, int portNumber, Direction direction)
-        {
-        this.direction = direction;
-        this.controller = controller;
-        this.portNumber = portNumber;
-        }
+	/**
+	 * Constructor
+	 *
+	 * @param controller Servo controller that this servo is attached to
+	 * @param portNumber physical port number on the servo controller
+	 * @param direction FORWARD for normal operation, REVERSE to reverse operation
+	 */
+	public CRServoImpl(final ServoController controller, final int portNumber, final Direction direction) {
+		this.direction = direction;
+		this.controller = controller;
+		this.portNumber = portNumber;
+	}
 
-    //----------------------------------------------------------------------------------------------
-    // HardwareDevice interface
-    //----------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------
+	// HardwareDevice interface
+	// ----------------------------------------------------------------------------------------------
 
-    @Override
-    public Manufacturer getManufacturer()
-        {
-        return controller.getManufacturer();
-        }
+	@Override
+	public Manufacturer getManufacturer() {
+		return controller.getManufacturer();
+	}
 
-    @Override
-    public String getDeviceName()
-        {
-        return "Continuous Rotation Servo";
-        }
+	@Override
+	public String getDeviceName() {
+		return "Continuous Rotation Servo";
+	}
 
-    @Override
-    public String getConnectionInfo()
-        {
-        return controller.getConnectionInfo() + "; port " + portNumber;
-        }
+	@Override
+	public String getConnectionInfo() {
+		return controller.getConnectionInfo() + "; port " + portNumber;
+	}
 
-    @Override
-    public int getVersion()
-        {
-        return 1;
-        }
+	@Override
+	public int getVersion() {
+		return 1;
+	}
 
-    @Override
-    public synchronized void resetDeviceConfigurationForOpMode()
-        {
-        this.direction = Direction.FORWARD;
-        }
+	@Override
+	public synchronized void resetDeviceConfigurationForOpMode() {
+		direction = Direction.FORWARD;
+	}
 
-    @Override
-    public void close()
-        {
-        // take no action
-        }
+	@Override
+	public void close() {
+		// take no action
+	}
 
-    //----------------------------------------------------------------------------------------------
-    // ContinuousRotationServo interface
-    //----------------------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------
+	// ContinuousRotationServo interface
+	// ----------------------------------------------------------------------------------------------
 
-    @Override
-    public ServoController getController()
-        {
-        return this.controller;
-        }
+	@Override
+	public ServoController getController() {
+		return controller;
+	}
 
-    @Override
-    public int getPortNumber()
-        {
-        return this.portNumber;
-        }
+	@Override
+	public int getPortNumber() {
+		return portNumber;
+	}
 
-    @Override
-    public synchronized void setDirection(Direction direction)
-        {
-        this.direction = direction;
-        }
+	@Override
+	public synchronized void setDirection(final Direction direction) {
+		this.direction = direction;
+	}
 
-    @Override
-    public synchronized Direction getDirection()
-        {
-        return this.direction;
-        }
+	@Override
+	public synchronized Direction getDirection() {
+		return direction;
+	}
 
-    @Override
-    public void setPower(double power)
-        {
-        // For CR Servos on MR/HiTechnic hardware, internal positions relate to speed as follows:
-        //
-        //      0   == full speed reverse
-        //      128 == stopped
-        //      255 == full speed forward
-        //
-        if (this.direction == Direction.REVERSE) power = -power;
-        power = Range.clip(power, apiPowerMin, apiPowerMax);
-        power = Range.scale(power, apiPowerMin, apiPowerMax, apiServoPositionMin, apiServoPositionMax);
-        this.controller.setServoPosition(this.portNumber, power);
-        }
+	@Override
+	public void setPower(double power) {
+		// For CR Servos on MR/HiTechnic hardware, internal positions relate to speed as follows:
+		//
+		// 0 == full speed reverse
+		// 128 == stopped
+		// 255 == full speed forward
+		//
+		if (direction == Direction.REVERSE) power = -power;
+		power = Range.clip(power, apiPowerMin, apiPowerMax);
+		power = Range.scale(power, apiPowerMin, apiPowerMax, apiServoPositionMin, apiServoPositionMax);
+		controller.setServoPosition(portNumber, power);
+	}
 
-    @Override
-    public double getPower()
-        {
-        double power = this.controller.getServoPosition(this.portNumber);
-        power = Range.scale(power, apiServoPositionMin, apiServoPositionMax, apiPowerMin, apiPowerMax);
-        if (this.direction == Direction.REVERSE) power = -power;
-        return power;
-        }
-    }
+	@Override
+	public double getPower() {
+		double power = controller.getServoPosition(portNumber);
+		power = Range.scale(power, apiServoPositionMin, apiServoPositionMax, apiPowerMin, apiPowerMax);
+		if (direction == Direction.REVERSE) power = -power;
+		return power;
+	}
+}

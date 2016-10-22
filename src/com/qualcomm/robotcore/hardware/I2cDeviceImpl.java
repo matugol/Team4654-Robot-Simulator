@@ -1,22 +1,22 @@
 /*
  * Copyright (c) 2015 Qualcomm Technologies Inc
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
  * (subject to the limitations in the disclaimer below) provided that the following conditions are
  * met:
- *
+ * 
  * Redistributions of source code must retain the above copyright notice, this list of conditions
  * and the following disclaimer.
- *
+ * 
  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
  * and the following disclaimer in the documentation and/or other materials provided with the
  * distribution.
- *
+ * 
  * Neither the name of Qualcomm Technologies Inc nor the names of its contributors may be used to
  * endorse or promote products derived from this software without specific prior written permission.
- *
+ * 
  * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
  * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -38,337 +38,385 @@ import java.util.concurrent.locks.Lock;
  */
 public class I2cDeviceImpl extends I2cControllerPortDeviceImpl implements I2cDevice, HardwareDevice, I2cController.I2cPortReadyCallback {
 
-  //------------------------------------------------------------------------------------------------
-  // State
-  //------------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------------------------------------------
+	// State
+	// ------------------------------------------------------------------------------------------------
 
-  protected I2cController.I2cPortReadyCallback callback;
-  protected AtomicInteger                      callbackCount;
+	protected I2cController.I2cPortReadyCallback callback;
+	protected AtomicInteger callbackCount;
 
-  //------------------------------------------------------------------------------------------------
-  // Construction
-  //------------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------------------------------------------
+	// Construction
+	// ------------------------------------------------------------------------------------------------
 
-  /**
-   * Constructor
-   *
-   * @param controller I2C controller this channel is attached to
-   * @param port port on the I2C controller
-   */
-  public I2cDeviceImpl(I2cController controller, int port) {
-    super(controller, port);
-    this.callback      = null;
-    this.callbackCount = new AtomicInteger(0);
-  }
+	/**
+	 * Constructor
+	 *
+	 * @param controller I2C controller this channel is attached to
+	 * @param port port on the I2C controller
+	 */
+	public I2cDeviceImpl(final I2cController controller, final int port) {
+		super(controller, port);
+		callback = null;
+		callbackCount = new AtomicInteger(0);
+	}
 
-  @Override
-  protected void controllerNowArmedOrPretending() {
-    // Nothing needed
-    }
+	@Override
+	protected void controllerNowArmedOrPretending() {
+		// Nothing needed
+	}
 
-  //------------------------------------------------------------------------------------------------
-  // I2cDevice interface
-  //------------------------------------------------------------------------------------------------
+	// ------------------------------------------------------------------------------------------------
+	// I2cDevice interface
+	// ------------------------------------------------------------------------------------------------
 
- /**
-   * returns the I2cController on which this device is found
-   * @return the I2cController on which this device is found
-   */
-  @Override public I2cController getController() {
-    return this.controller;
-  }
+	/**
+	 * returns the I2cController on which this device is found
+	 * 
+	 * @return the I2cController on which this device is found
+	 */
+	@Override
+	public I2cController getController() {
+		return controller;
+	}
 
-  /**
-   * returns the port number on the controller on which this device is found
-   * @return the port number on the controller on which this device is found
-   */
-  @Override public int getPort() {
-    return this.physicalPort;
-  }
+	/**
+	 * returns the port number on the controller on which this device is found
+	 * 
+	 * @return the port number on the controller on which this device is found
+	 */
+	@Override
+	public int getPort() {
+		return physicalPort;
+	}
 
-  /**
-   * Enable read mode for this I2C device
-   * @param memAddress mem address at which to start reading
-   * @param length number of bytes to read
-   */
-  @Deprecated @Override
-  public void enableI2cReadMode(I2cAddr i2cAddr, int memAddress, int length) {
-    controller.enableI2cReadMode(physicalPort, i2cAddr, memAddress, length);
-  }
+	/**
+	 * Enable read mode for this I2C device
+	 * 
+	 * @param memAddress mem address at which to start reading
+	 * @param length number of bytes to read
+	 */
+	@Deprecated
+	@Override
+	public void enableI2cReadMode(final I2cAddr i2cAddr, final int memAddress, final int length) {
+		controller.enableI2cReadMode(physicalPort, i2cAddr, memAddress, length);
+	}
 
-  /**
-   * Enable write mode for this I2C device
-   * @param memAddress mem address at which to start writing
-   * @param length number of bytes to write
-   */
-  @Deprecated @Override
-  public void enableI2cWriteMode(I2cAddr i2cAddr, int memAddress, int length) {
-    controller.enableI2cWriteMode(physicalPort, i2cAddr, memAddress, length);
-  }
+	/**
+	 * Enable write mode for this I2C device
+	 * 
+	 * @param memAddress mem address at which to start writing
+	 * @param length number of bytes to write
+	 */
+	@Deprecated
+	@Override
+	public void enableI2cWriteMode(final I2cAddr i2cAddr, final int memAddress, final int length) {
+		controller.enableI2cWriteMode(physicalPort, i2cAddr, memAddress, length);
+	}
 
-  /**
-   * Get a copy of the most recent data read in from the device
-   * @return a copy of the most recent data read in from the device
-   */
-  @Override public byte[] getCopyOfReadBuffer() {
-    return controller.getCopyOfReadBuffer(physicalPort);
-  }
+	/**
+	 * Get a copy of the most recent data read in from the device
+	 * 
+	 * @return a copy of the most recent data read in from the device
+	 */
+	@Override
+	public byte[] getCopyOfReadBuffer() {
+		return controller.getCopyOfReadBuffer(physicalPort);
+	}
 
-  /**
-   * Get a copy of the data that is set to be written out to the device
-   * @return a copy of the data set to be written out to the device
-   */
-  @Override public byte[] getCopyOfWriteBuffer() {
-    return controller.getCopyOfWriteBuffer(physicalPort);
-  }
+	/**
+	 * Get a copy of the data that is set to be written out to the device
+	 * 
+	 * @return a copy of the data set to be written out to the device
+	 */
+	@Override
+	public byte[] getCopyOfWriteBuffer() {
+		return controller.getCopyOfWriteBuffer(physicalPort);
+	}
 
-  /**
-   * Copy a byte array into the buffer that is set to be written out to the device
-   * @param buffer buffer to copy
-   */
-  @Override public void copyBufferIntoWriteBuffer(byte[] buffer) {
-    controller.copyBufferIntoWriteBuffer(physicalPort, buffer);
-  }
-  /**
-   * Set the port action flag; this flag tells the controller to send the
-   * current data in its buffer to the I2C device
-   */
-  @Override public void setI2cPortActionFlag() {
-    controller.setI2cPortActionFlag(physicalPort);
-  }
+	/**
+	 * Copy a byte array into the buffer that is set to be written out to the device
+	 * 
+	 * @param buffer buffer to copy
+	 */
+	@Override
+	public void copyBufferIntoWriteBuffer(final byte[] buffer) {
+		controller.copyBufferIntoWriteBuffer(physicalPort, buffer);
+	}
 
-  @Override public void clearI2cPortActionFlag() {
-    controller.clearI2cPortActionFlag(physicalPort);
-  }
+	/**
+	 * Set the port action flag; this flag tells the controller to send the
+	 * current data in its buffer to the I2C device
+	 */
+	@Override
+	public void setI2cPortActionFlag() {
+		controller.setI2cPortActionFlag(physicalPort);
+	}
 
-/**
-   * Check whether or not the action flag is set for this I2C port
-   * @return a boolean indicating whether or not the flag is set
-   */
-  @Override public boolean isI2cPortActionFlagSet() {
-    return controller.isI2cPortActionFlagSet(physicalPort);
-  }
+	@Override
+	public void clearI2cPortActionFlag() {
+		controller.clearI2cPortActionFlag(physicalPort);
+	}
 
-  /**
-   * Trigger a read of the I2C cache
-   */
-  @Override public void readI2cCacheFromController() {
-    controller.readI2cCacheFromController(physicalPort);
-  }
+	/**
+	 * Check whether or not the action flag is set for this I2C port
+	 * 
+	 * @return a boolean indicating whether or not the flag is set
+	 */
+	@Override
+	public boolean isI2cPortActionFlagSet() {
+		return controller.isI2cPortActionFlagSet(physicalPort);
+	}
 
-  /**
-   * Trigger a write of the I2C cache
-   */
-  @Override public void writeI2cCacheToController() {
-    controller.writeI2cCacheToController(physicalPort);
-  }
+	/**
+	 * Trigger a read of the I2C cache
+	 */
+	@Override
+	public void readI2cCacheFromController() {
+		controller.readI2cCacheFromController(physicalPort);
+	}
 
-  /**
-   * Write only the action flag
-   */
-  @Override public void writeI2cPortFlagOnlyToController() {
-    controller.writeI2cPortFlagOnlyToController(physicalPort);
-  }
+	/**
+	 * Trigger a write of the I2C cache
+	 */
+	@Override
+	public void writeI2cCacheToController() {
+		controller.writeI2cCacheToController(physicalPort);
+	}
 
-  /**
-   * Query whether or not the port is in Read mode
-   * @return whether or not this port is in read mode
-   */
-  @Override public boolean isI2cPortInReadMode() {
-    return controller.isI2cPortInReadMode(physicalPort);
-  }
+	/**
+	 * Write only the action flag
+	 */
+	@Override
+	public void writeI2cPortFlagOnlyToController() {
+		controller.writeI2cPortFlagOnlyToController(physicalPort);
+	}
 
-  /**
-   * Query whether or not this port is in write mode
-   * @return whether or not this port is in write mode
-   */
-  @Override public boolean isI2cPortInWriteMode() {
-    return controller.isI2cPortInWriteMode(physicalPort);
-  }
+	/**
+	 * Query whether or not the port is in Read mode
+	 * 
+	 * @return whether or not this port is in read mode
+	 */
+	@Override
+	public boolean isI2cPortInReadMode() {
+		return controller.isI2cPortInReadMode(physicalPort);
+	}
 
-  /**
-   * Query whether or not this I2c port is ready
-   * @return boolean indicating I2c port readiness
-   */
-  @Override public boolean isI2cPortReady() {
-    return controller.isI2cPortReady(physicalPort);
-  }
+	/**
+	 * Query whether or not this port is in write mode
+	 * 
+	 * @return whether or not this port is in write mode
+	 */
+	@Override
+	public boolean isI2cPortInWriteMode() {
+		return controller.isI2cPortInWriteMode(physicalPort);
+	}
 
-  /**
-   * Get access to the read cache lock.
-   * <p>
-   * This is needed if you are accessing the read cache directly. The read
-   * cache lock needs to be acquired before attempting to interact with the read cache
-   * @return the read cache lock
-   */
-  @Override public Lock getI2cReadCacheLock() {
-    return controller.getI2cReadCacheLock(physicalPort);
-  }
+	/**
+	 * Query whether or not this I2c port is ready
+	 * 
+	 * @return boolean indicating I2c port readiness
+	 */
+	@Override
+	public boolean isI2cPortReady() {
+		return controller.isI2cPortReady(physicalPort);
+	}
 
-  /**
-   * Get access to the write cache lock.
-   * <p>
-   * This is needed if you ace accessing the write cache directly. The write
-   * cache lock needs to be acquired before attempting to interact with the
-   * write cache
-   * @return write cache lock
-   */
-  @Override public Lock getI2cWriteCacheLock() {
-    return controller.getI2cWriteCacheLock(physicalPort);
-  }
+	/**
+	 * Get access to the read cache lock.
+	 * <p>
+	 * This is needed if you are accessing the read cache directly. The read cache lock needs to be acquired before attempting
+	 * to interact with the read cache
+	 * 
+	 * @return the read cache lock
+	 */
+	@Override
+	public Lock getI2cReadCacheLock() {
+		return controller.getI2cReadCacheLock(physicalPort);
+	}
 
-  /**
-   * Get direct access to the read cache used by this I2C device
-   * <p>
-   * Please lock the cache before accessing it.
-   * @return the read cache
-   */
-  @Override public byte[] getI2cReadCache() {
-    return controller.getI2cReadCache(physicalPort);
-  }
+	/**
+	 * Get access to the write cache lock.
+	 * <p>
+	 * This is needed if you ace accessing the write cache directly. The write cache lock needs to be acquired before attempting
+	 * to interact with the write cache
+	 * 
+	 * @return write cache lock
+	 */
+	@Override
+	public Lock getI2cWriteCacheLock() {
+		return controller.getI2cWriteCacheLock(physicalPort);
+	}
 
-  /**
-   * Get direct access to the write cache used by this I2C device
-   * <p>
-   * Please lock the cache before accessing it.
-   * @return the write cache
-   */
-  @Override public byte[] getI2cWriteCache() {
-    return controller.getI2cWriteCache(physicalPort);
-  }
+	/**
+	 * Get direct access to the read cache used by this I2C device
+	 * <p>
+	 * Please lock the cache before accessing it.
+	 * 
+	 * @return the read cache
+	 */
+	@Override
+	public byte[] getI2cReadCache() {
+		return controller.getI2cReadCache(physicalPort);
+	}
 
-  //------------------------------------------------------------------------------------------------
-  // portIsReady callback management
-  //------------------------------------------------------------------------------------------------
+	/**
+	 * Get direct access to the write cache used by this I2C device
+	 * <p>
+	 * Please lock the cache before accessing it.
+	 * 
+	 * @return the write cache
+	 */
+	@Override
+	public byte[] getI2cWriteCache() {
+		return controller.getI2cWriteCache(physicalPort);
+	}
 
-  @Override
-  public void portIsReady(int port) {
-    this.callbackCount.incrementAndGet();
-    I2cController.I2cPortReadyCallback callback = this.callback;
-    if (callback != null) {
-      callback.portIsReady(port);
-    }
-  }
+	// ------------------------------------------------------------------------------------------------
+	// portIsReady callback management
+	// ------------------------------------------------------------------------------------------------
 
- /**
-   * The method used to register for a port-ready callback
-   * @param callback pass in the I2C callback that will be called when the device is ready
-   */
-  @Override public synchronized void registerForI2cPortReadyCallback(I2cController.I2cPortReadyCallback callback) {
-    this.callback = callback;
-    controller.registerForI2cPortReadyCallback(this, physicalPort);
-  }
+	@Override
+	public void portIsReady(final int port) {
+		callbackCount.incrementAndGet();
+		final I2cController.I2cPortReadyCallback callback = this.callback;
+		if (callback != null) {
+			callback.portIsReady(port);
+		}
+	}
 
-  /**
-   * returns the currently registered port-ready callback for this device
-   * @return the currently registered port-ready callback for this device
-   */
-  @Override public I2cController.I2cPortReadyCallback getI2cPortReadyCallback() {
-    return this.callback;
-  }
+	/**
+	 * The method used to register for a port-ready callback
+	 * 
+	 * @param callback pass in the I2C callback that will be called when the device is ready
+	 */
+	@Override
+	public synchronized void registerForI2cPortReadyCallback(final I2cController.I2cPortReadyCallback callback) {
+		this.callback = callback;
+		controller.registerForI2cPortReadyCallback(this, physicalPort);
+	}
 
-  /**
-   * Unregister for a port-ready callback
-   */
-  @Override public synchronized void deregisterForPortReadyCallback() {
-    controller.deregisterForPortReadyCallback(physicalPort);
-    this.callback = null;
-  }
+	/**
+	 * returns the currently registered port-ready callback for this device
+	 * 
+	 * @return the currently registered port-ready callback for this device
+	 */
+	@Override
+	public I2cController.I2cPortReadyCallback getI2cPortReadyCallback() {
+		return callback;
+	}
 
-  @Override
-  public int getCallbackCount() {
-    return this.callbackCount.get();
-  }
+	/**
+	 * Unregister for a port-ready callback
+	 */
+	@Override
+	public synchronized void deregisterForPortReadyCallback() {
+		controller.deregisterForPortReadyCallback(physicalPort);
+		callback = null;
+	}
 
-//------------------------------------------------------------------------------------------------
-  // Callback begin / end notifications
-  //------------------------------------------------------------------------------------------------
+	@Override
+	public int getCallbackCount() {
+		return callbackCount.get();
+	}
 
-  /**
-   * registers for notifications as to when port-ready callbacks begin or cease
-   * @param callback the callback which will receive such notifications
-   */
-  @Override public void registerForPortReadyBeginEndCallback(I2cController.I2cPortReadyBeginEndNotifications callback) {
-    controller.registerForPortReadyBeginEndCallback(callback, physicalPort);
-  }
+// ------------------------------------------------------------------------------------------------
+	// Callback begin / end notifications
+	// ------------------------------------------------------------------------------------------------
 
-  /**
-   * returns the currently registered callback that will receive begin and cessation notifications
-   * @return the currently registered callback that will receive begin and cessation notifications
-   */
-  @Override public I2cController.I2cPortReadyBeginEndNotifications getPortReadyBeginEndCallback() {
-    return controller.getPortReadyBeginEndCallback(physicalPort);
-  }
+	/**
+	 * registers for notifications as to when port-ready callbacks begin or cease
+	 * 
+	 * @param callback the callback which will receive such notifications
+	 */
+	@Override
+	public void registerForPortReadyBeginEndCallback(final I2cController.I2cPortReadyBeginEndNotifications callback) {
+		controller.registerForPortReadyBeginEndCallback(callback, physicalPort);
+	}
 
-  /**
-   * deregister for port-ready begin and cessation notifications
-   */
-  @Override public void deregisterForPortReadyBeginEndCallback() {
-    controller.deregisterForPortReadyBeginEndCallback(physicalPort);
-  }
+	/**
+	 * returns the currently registered callback that will receive begin and cessation notifications
+	 * 
+	 * @return the currently registered callback that will receive begin and cessation notifications
+	 */
+	@Override
+	public I2cController.I2cPortReadyBeginEndNotifications getPortReadyBeginEndCallback() {
+		return controller.getPortReadyBeginEndCallback(physicalPort);
+	}
 
-  //------------------------------------------------------------------------------------------------
-  // Arming and disarming
-  //------------------------------------------------------------------------------------------------
+	/**
+	 * deregister for port-ready begin and cessation notifications
+	 */
+	@Override
+	public void deregisterForPortReadyBeginEndCallback() {
+		controller.deregisterForPortReadyBeginEndCallback(physicalPort);
+	}
 
-  @Override
-  public boolean isArmed() {
-    return controller.isArmed();
-    }
+	// ------------------------------------------------------------------------------------------------
+	// Arming and disarming
+	// ------------------------------------------------------------------------------------------------
 
-  //------------------------------------------------------------------------------------------------
-  // HardwareDevice interface
-  //------------------------------------------------------------------------------------------------
+	@Override
+	public boolean isArmed() {
+		return controller.isArmed();
+	}
 
-  @Override public Manufacturer getManufacturer() {
-    return controller.getManufacturer();
-  }
+	// ------------------------------------------------------------------------------------------------
+	// HardwareDevice interface
+	// ------------------------------------------------------------------------------------------------
 
-  @Override
-  public String getDeviceName() {
-    return "I2cDevice";
-  }
+	@Override
+	public Manufacturer getManufacturer() {
+		return controller.getManufacturer();
+	}
 
-  @Override
-  public String getConnectionInfo() {
-    return controller.getConnectionInfo() + "; port " + physicalPort;
-  }
+	@Override
+	public String getDeviceName() {
+		return "I2cDevice";
+	}
 
-  @Override
-  public int getVersion() {
-    return 1;
-  }
+	@Override
+	public String getConnectionInfo() {
+		return controller.getConnectionInfo() + "; port " + physicalPort;
+	}
 
-  @Override
-  public void resetDeviceConfigurationForOpMode() {
-  }
+	@Override
+	public int getVersion() {
+		return 1;
+	}
 
-  @Override
-  public void close() {
-    // take no action
-  }
+	@Override
+	public void resetDeviceConfigurationForOpMode() {}
 
-  /**
-   * Deprecated, use readI2cCacheFromController()
-   */
-  @Deprecated @Override
-  public void readI2cCacheFromModule() {
-    readI2cCacheFromController();
-  }
+	@Override
+	public void close() {
+		// take no action
+	}
 
-  /**
-   * Deprecated, use writeI2cCacheToController()
-   */
-  @Deprecated @Override
-  public void writeI2cCacheToModule() {
-    writeI2cCacheToController();
-  }
+	/**
+	 * Deprecated, use readI2cCacheFromController()
+	 */
+	@Deprecated
+	@Override
+	public void readI2cCacheFromModule() {
+		readI2cCacheFromController();
+	}
 
-  /**
-   * Deprecated, use writeI2cPortFlagOnlyToController()
-   */
-  @Deprecated @Override
-  public void writeI2cPortFlagOnlyToModule() {
-    writeI2cPortFlagOnlyToController();
-  }
+	/**
+	 * Deprecated, use writeI2cCacheToController()
+	 */
+	@Deprecated
+	@Override
+	public void writeI2cCacheToModule() {
+		writeI2cCacheToController();
+	}
+
+	/**
+	 * Deprecated, use writeI2cPortFlagOnlyToController()
+	 */
+	@Deprecated
+	@Override
+	public void writeI2cPortFlagOnlyToModule() {
+		writeI2cPortFlagOnlyToController();
+	}
 }

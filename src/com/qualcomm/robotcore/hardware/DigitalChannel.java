@@ -1,22 +1,22 @@
 /*
  * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
  * (subject to the limitations in the disclaimer below) provided that the following conditions are
  * met:
- *
+ * 
  * Redistributions of source code must retain the above copyright notice, this list of conditions
  * and the following disclaimer.
- *
+ * 
  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
  * and the following disclaimer in the documentation and/or other materials provided with the
  * distribution.
- *
+ * 
  * Neither the name of Qualcomm Technologies Inc nor the names of its contributors may be used to
  * endorse or promote products derived from this software without specific prior written permission.
- *
+ * 
  * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
  * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -35,83 +35,83 @@ package com.qualcomm.robotcore.hardware;
  */
 public class DigitalChannel implements HardwareDevice {
 
-  private DigitalChannelController controller = null;
-  private int channel = -1;
+	private DigitalChannelController controller = null;
+	private int channel = -1;
 
-  /**
-   * Constructor
-   *
-   * @param controller Digital channel controller this channel is attached to
-   * @param channel channel on the digital channel controller
-   */
-  public DigitalChannel(DigitalChannelController controller, int channel) {
-    this.controller = controller;
-    this.channel = channel;
-  }
+	/**
+	 * Constructor
+	 *
+	 * @param controller Digital channel controller this channel is attached to
+	 * @param channel channel on the digital channel controller
+	 */
+	public DigitalChannel(final DigitalChannelController controller, final int channel) {
+		this.controller = controller;
+		this.channel = channel;
+	}
 
-  /**
-   * Get the channel mode
-   *
-   * @return channel mode
-   */
-  public DigitalChannelController.Mode getMode() {
-    return controller.getDigitalChannelMode(channel);
-  }
+	/**
+	 * Get the channel mode
+	 *
+	 * @return channel mode
+	 */
+	public DigitalChannelController.Mode getMode() {
+		return controller.getDigitalChannelMode(channel);
+	}
 
-  /**
-   * Set the channel mode
-   *
-   * @param mode
-   */
-  public void setMode(DigitalChannelController.Mode mode) {
-    controller.setDigitalChannelMode(channel, mode);
-  }
+	/**
+	 * Set the channel mode
+	 *
+	 * @param mode
+	 */
+	public void setMode(final DigitalChannelController.Mode mode) {
+		controller.setDigitalChannelMode(channel, mode);
+	}
 
-  /**
-   * Get the channel state
-   *
-   * @return state
-   */
-  public boolean getState() {
-    return controller.getDigitalChannelState(channel);
-  }
+	/**
+	 * Get the channel state
+	 *
+	 * @return state
+	 */
+	public boolean getState() {
+		return controller.getDigitalChannelState(channel);
+	}
 
-  /**
-   * Set the channel state
-   * <p>
-   * The behavior of this method is undefined for INPUT digital channels.
-   *
-   * @param state
-   */
-  public void setState(boolean state) {
-    controller.setDigitalChannelState(channel, state);
-  }
+	/**
+	 * Set the channel state
+	 * <p>
+	 * The behavior of this method is undefined for INPUT digital channels.
+	 *
+	 * @param state
+	 */
+	public void setState(final boolean state) {
+		controller.setDigitalChannelState(channel, state);
+	}
 
-  @Override public Manufacturer getManufacturer() {
-    return controller.getManufacturer();
-  }
+	@Override
+	public Manufacturer getManufacturer() {
+		return controller.getManufacturer();
+	}
 
-  @Override
-  public String getDeviceName() {
-    return "Digital Channel";
-  }
+	@Override
+	public String getDeviceName() {
+		return "Digital Channel";
+	}
 
-  @Override
-  public String getConnectionInfo() {
-    return controller.getConnectionInfo() + "; digital port " + channel;
-  }
+	@Override
+	public String getConnectionInfo() {
+		return controller.getConnectionInfo() + "; digital port " + channel;
+	}
 
-  @Override
-  public int getVersion() {
-    return 1;
-  }
+	@Override
+	public int getVersion() {
+		return 1;
+	}
 
-  @Override
-  public void resetDeviceConfigurationForOpMode() {
-  }
+	@Override
+	public void resetDeviceConfigurationForOpMode() {}
 
-  @Override
-  public void close() {
-    // take no action
-  }
+	@Override
+	public void close() {
+		// take no action
+	}
 }
