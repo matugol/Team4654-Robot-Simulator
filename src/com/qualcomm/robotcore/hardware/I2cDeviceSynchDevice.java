@@ -1,139 +1,162 @@
-/*
- * Copyright (c) 2016 Robert Atkinson
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- * 
- * Neither the name of Robert Atkinson nor the names of his contributors may be used to
- * endorse or promote products derived from this software without specific prior
- * written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESSFOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.hardware;
+/*     */ 
+/*     */ import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier;
+/*     */ import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier.ARMINGSTATE;
+/*     */ import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier.Callback;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public abstract class I2cDeviceSynchDevice<T extends I2cDeviceSynchSimple>
+/*     */   implements RobotArmingStateNotifier.Callback, HardwareDevice
+/*     */ {
+/*     */   protected T deviceClient;
+/*     */   protected boolean deviceClientIsOwned;
+/*     */   protected boolean isInitialized;
+/*     */   
+/*     */   protected I2cDeviceSynchDevice(T deviceClient, boolean isOwned)
+/*     */   {
+/*  58 */     this.deviceClient = deviceClient;
+/*  59 */     this.deviceClientIsOwned = isOwned;
+/*  60 */     this.isInitialized = false;
+/*  61 */     this.deviceClient.enableWriteCoalescing(false);
+/*     */   }
+/*     */   
+/*     */   protected void registerArmingStateCallback()
+/*     */   {
+/*  66 */     if ((this.deviceClient instanceof RobotArmingStateNotifier))
+/*     */     {
+/*  68 */       ((RobotArmingStateNotifier)this.deviceClient).registerCallback(this);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void engage()
+/*     */   {
+/*  74 */     if ((this.deviceClient instanceof Engagable))
+/*     */     {
+/*  76 */       ((Engagable)this.deviceClient).engage();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void disengage()
+/*     */   {
+/*  82 */     if ((this.deviceClient instanceof Engagable))
+/*     */     {
+/*  84 */       ((Engagable)this.deviceClient).disengage();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void onModuleStateChange(RobotArmingStateNotifier module, RobotArmingStateNotifier.ARMINGSTATE state)
+/*     */   {
+/*  96 */     if (state == RobotArmingStateNotifier.ARMINGSTATE.ARMED)
+/*     */     {
+/*  98 */       initializeIfNecessary();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected synchronized void initializeIfNecessary()
+/*     */   {
+/* 104 */     if (!this.isInitialized)
+/*     */     {
+/* 106 */       initialize();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public synchronized boolean initialize()
+/*     */   {
+/* 112 */     if (doInitialize())
+/*     */     {
+/* 114 */       this.isInitialized = true;
+/* 115 */       return true;
+/*     */     }
+/* 117 */     return false;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   protected abstract boolean doInitialize();
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void resetDeviceConfigurationForOpMode()
+/*     */   {
+/* 133 */     this.isInitialized = false;
+/* 134 */     initialize();
+/*     */   }
+/*     */   
+/*     */   public void close()
+/*     */   {
+/* 139 */     if (this.deviceClientIsOwned)
+/*     */     {
+/* 141 */       this.deviceClient.close();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public int getVersion()
+/*     */   {
+/* 148 */     return 1;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public String getConnectionInfo()
+/*     */   {
+/* 154 */     return this.deviceClient.getConnectionInfo();
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\I2cDeviceSynchDevice.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-package com.qualcomm.robotcore.hardware;
-
-import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier;
-
-/**
- * {@link I2cDeviceSynchDevice} instances are I2c devices which are built on top of
- * I2cDeviceSynchSimple instances or subclasses thereof. The class provides common and handy utility services
- * for such devices.
- */
-public abstract class I2cDeviceSynchDevice<T extends I2cDeviceSynchSimple> implements RobotArmingStateNotifier.Callback, HardwareDevice {
-	// ----------------------------------------------------------------------------------------------
-	// State
-	// ----------------------------------------------------------------------------------------------
-
-	protected T deviceClient;
-	protected boolean deviceClientIsOwned;
-	protected boolean isInitialized;
-
-	// ----------------------------------------------------------------------------------------------
-	// Construction
-	// ----------------------------------------------------------------------------------------------
-
-	protected I2cDeviceSynchDevice(final T deviceClient, final boolean isOwned) {
-		this.deviceClient = deviceClient;
-		this.deviceClientIsOwned = isOwned;
-		this.isInitialized = false;
-		this.deviceClient.enableWriteCoalescing(false);
-	}
-
-	protected void registerArmingStateCallback() {
-		if (deviceClient instanceof RobotArmingStateNotifier) {
-			((RobotArmingStateNotifier) deviceClient).registerCallback(this);
-		}
-	}
-
-	protected void engage() {
-		if (this.deviceClient instanceof Engagable) {
-			((Engagable) this.deviceClient).engage();
-		}
-	}
-
-	protected void disengage() {
-		if (this.deviceClient instanceof Engagable) {
-			((Engagable) this.deviceClient).disengage();
-		}
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// RobotArmingStateNotifier.Callback
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public void onModuleStateChange(final RobotArmingStateNotifier module, final RobotArmingStateNotifier.ARMINGSTATE state) {
-		// We need to make sure that the actual hardware gets initialized at least once
-		if (state == RobotArmingStateNotifier.ARMINGSTATE.ARMED) {
-			initializeIfNecessary();
-		}
-	}
-
-	protected synchronized void initializeIfNecessary() {
-		if (!this.isInitialized) {
-			this.initialize();
-		}
-	}
-
-	public synchronized boolean initialize() {
-		if (this.doInitialize()) {
-			this.isInitialized = true;
-			return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Actually carries out the initialization of the instance.
-	 * 
-	 * @return Whether the initialization was successful or not
-	 */
-	protected abstract boolean doInitialize();
-
-	// ----------------------------------------------------------------------------------------------
-	// HardwareDevice
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public void resetDeviceConfigurationForOpMode() {
-		this.isInitialized = false;
-		this.initialize();
-	}
-
-	@Override
-	public void close() {
-		if (this.deviceClientIsOwned) {
-			this.deviceClient.close();
-		}
-	}
-
-	@Override
-	public int getVersion() {
-		return 1;
-	}
-
-	@Override
-	public String getConnectionInfo() {
-		return this.deviceClient.getConnectionInfo();
-	}
-}

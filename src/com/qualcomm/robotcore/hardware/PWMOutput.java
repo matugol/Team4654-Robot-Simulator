@@ -1,14 +1,19 @@
 package com.qualcomm.robotcore.hardware;
 
-/**
- * Created by bob on 2016-03-12.
- */
-public interface PWMOutput extends HardwareDevice {
-	void setPulseWidthOutputTime(int usDuration);
-
-	int getPulseWidthOutputTime();
-
-	void setPulseWidthPeriod(int usFrame);
-
-	int getPulseWidthPeriod();
+public abstract interface PWMOutput
+  extends HardwareDevice
+{
+  public abstract void setPulseWidthOutputTime(int paramInt);
+  
+  public abstract int getPulseWidthOutputTime();
+  
+  public abstract void setPulseWidthPeriod(int paramInt);
+  
+  public abstract int getPulseWidthPeriod();
 }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\PWMOutput.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
+ */

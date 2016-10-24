@@ -1,1410 +1,1910 @@
-/*
- * Copyright (c) 2016 Robert Atkinson
- *
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- *
- * Neither the name of Robert Atkinson nor the names of his contributors may be used to
- * endorse or promote products derived from this software without specific prior
- * written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESSFOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*      */ package com.qualcomm.robotcore.hardware;
+/*      */ 
+/*      */ import android.util.Log;
+/*      */ import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier;
+/*      */ import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier.ARMINGSTATE;
+/*      */ import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier.Callback;
+/*      */ import com.qualcomm.robotcore.hardware.usb.RobotUsbModule;
+/*      */ import com.qualcomm.robotcore.util.ElapsedTime;
+/*      */ import com.qualcomm.robotcore.util.ThreadPool;
+/*      */ import java.util.Arrays;
+/*      */ import java.util.concurrent.ExecutorService;
+/*      */ import java.util.concurrent.RejectedExecutionException;
+/*      */ import java.util.concurrent.TimeUnit;
+/*      */ import java.util.concurrent.atomic.AtomicInteger;
+/*      */ import java.util.concurrent.locks.Lock;
+/*      */ import java.util.concurrent.locks.ReadWriteLock;
+/*      */ import java.util.concurrent.locks.ReentrantReadWriteLock;
+/*      */ import org.firstinspires.ftc.robotcore.internal.Assert;
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ public final class I2cDeviceSynchImpl
+/*      */   implements I2cDeviceSynch, Engagable
+/*      */ {
+/*      */   protected I2cAddr i2cAddr;
+/*      */   protected I2cDevice i2cDevice;
+/*      */   protected boolean isI2cDeviceOwned;
+/*      */   protected I2cController controller;
+/*      */   protected RobotUsbModule robotUsbModule;
+/*      */   protected boolean isHooked;
+/*      */   protected boolean isEngaged;
+/*      */   protected AtomicInteger readerWriterPreventionCount;
+/*      */   protected ReadWriteLock readerWriterGate;
+/*      */   protected AtomicInteger readerWriterCount;
+/*      */   protected boolean isClosing;
+/*      */   protected Callback callback;
+/*      */   protected boolean loggingEnabled;
+/*      */   protected String loggingTag;
+/*      */   protected ElapsedTime timeSinceLastHeartbeat;
+/*      */   protected byte[] readCache;
+/*      */   protected byte[] writeCache;
+/*      */   protected static final int dibCacheOverhead = 4;
+/*      */   protected Lock readCacheLock;
+/*      */   protected Lock writeCacheLock;
+/*      */   protected static final int msCallbackLockWaitQuantum = 60;
+/*      */   protected static final int msCallbackLockAbandon = 500;
+/*      */   protected boolean isWriteCoalescingEnabled;
+/*   97 */   protected final Object engagementLock = new Object();
+/*   98 */   protected final Object concurrentClientLock = new Object();
+/*   99 */   protected final Object callbackLock = new Object();
+/*      */   
+/*      */   protected volatile I2cDeviceSynch.ReadWindow readWindow;
+/*      */   
+/*      */   protected volatile I2cDeviceSynch.ReadWindow readWindowActuallyRead;
+/*      */   protected volatile I2cDeviceSynch.ReadWindow readWindowSentToController;
+/*      */   protected volatile boolean isReadWindowSentToControllerInitialized;
+/*      */   protected volatile boolean hasReadWindowChanged;
+/*      */   protected volatile long nanoTimeReadCacheValid;
+/*      */   protected volatile READ_CACHE_STATUS readCacheStatus;
+/*      */   protected volatile WRITE_CACHE_STATUS writeCacheStatus;
+/*      */   protected volatile CONTROLLER_PORT_MODE controllerPortMode;
+/*      */   protected volatile int iregWriteFirst;
+/*      */   protected volatile int cregWrite;
+/*      */   protected volatile int msHeartbeatInterval;
+/*      */   protected volatile I2cDeviceSynch.HeartbeatAction heartbeatAction;
+/*      */   protected volatile ExecutorService heartbeatExecutor;
+/*      */   
+/*      */   protected static enum READ_CACHE_STATUS
+/*      */   {
+/*  119 */     IDLE, 
+/*  120 */     SWITCHINGTOREADMODE, 
+/*  121 */     QUEUED, 
+/*  122 */     QUEUE_COMPLETED, 
+/*  123 */     VALID_ONLYONCE, 
+/*  124 */     VALID_QUEUED;
+/*      */     
+/*      */     private READ_CACHE_STATUS() {}
+/*      */     
+/*  128 */     boolean isValid() { return (this == VALID_QUEUED) || (this == VALID_ONLYONCE); }
+/*      */     
+/*      */     boolean isQueued()
+/*      */     {
+/*  132 */       return (this == QUEUED) || (this == VALID_QUEUED);
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */   protected static enum WRITE_CACHE_STATUS
+/*      */   {
+/*  139 */     IDLE, 
+/*  140 */     DIRTY, 
+/*  141 */     QUEUED;
+/*      */     
+/*      */     private WRITE_CACHE_STATUS() {}
+/*      */   }
+/*      */   
+/*      */   protected static enum CONTROLLER_PORT_MODE {
+/*  147 */     UNKNOWN, 
+/*  148 */     WRITE, 
+/*  149 */     SWITCHINGTOREADMODE, 
+/*      */     
+/*  151 */     READ;
+/*      */     
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */     private CONTROLLER_PORT_MODE() {}
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public I2cDeviceSynchImpl(I2cDevice i2cDevice, I2cAddr i2cAddr, boolean isI2cDeviceOwned)
+/*      */   {
+/*  176 */     this.i2cAddr = i2cAddr;
+/*      */     
+/*  178 */     this.i2cDevice = i2cDevice;
+/*  179 */     this.isI2cDeviceOwned = isI2cDeviceOwned;
+/*  180 */     this.controller = i2cDevice.getI2cController();
+/*  181 */     this.isEngaged = false;
+/*  182 */     this.isClosing = false;
+/*  183 */     this.isHooked = false;
+/*  184 */     this.readerWriterPreventionCount = new AtomicInteger(0);
+/*  185 */     this.readerWriterGate = new ReentrantReadWriteLock();
+/*  186 */     this.readerWriterCount = new AtomicInteger(0);
+/*  187 */     this.callback = new Callback();
+/*  188 */     this.loggingEnabled = false;
+/*  189 */     this.loggingTag = String.format("%s:i2cSynch(%s)", new Object[] { "RobotCore", i2cDevice.getConnectionInfo() });
+/*  190 */     this.timeSinceLastHeartbeat = new ElapsedTime();
+/*  191 */     this.timeSinceLastHeartbeat.reset();
+/*  192 */     this.msHeartbeatInterval = 0;
+/*  193 */     this.heartbeatAction = null;
+/*  194 */     this.heartbeatExecutor = null;
+/*  195 */     this.isWriteCoalescingEnabled = false;
+/*      */     
+/*  197 */     this.readWindow = null;
+/*      */     
+/*  199 */     if ((this.controller instanceof RobotUsbModule))
+/*      */     {
+/*  201 */       this.robotUsbModule = ((RobotUsbModule)this.controller);
+/*  202 */       this.robotUsbModule.registerCallback(this.callback);
+/*      */     }
+/*      */     else {
+/*  205 */       throw new IllegalArgumentException("I2cController must also be a RobotUsbModule");
+/*      */     }
+/*  207 */     this.i2cDevice.registerForPortReadyBeginEndCallback(this.callback);
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public I2cDeviceSynchImpl(I2cDevice i2cDevice, boolean isI2cDeviceOwned)
+/*      */   {
+/*  218 */     this(i2cDevice, I2cAddr.zero(), isI2cDeviceOwned);
+/*      */   }
+/*      */   
+/*      */ 
+/*      */   void attachToController()
+/*      */   {
+/*  224 */     this.readCache = this.i2cDevice.getI2cReadCache();
+/*  225 */     this.readCacheLock = this.i2cDevice.getI2cReadCacheLock();
+/*  226 */     this.writeCache = this.i2cDevice.getI2cWriteCache();
+/*  227 */     this.writeCacheLock = this.i2cDevice.getI2cWriteCacheLock();
+/*      */     
+/*  229 */     this.nanoTimeReadCacheValid = 0L;
+/*  230 */     this.readCacheStatus = READ_CACHE_STATUS.IDLE;
+/*  231 */     this.writeCacheStatus = WRITE_CACHE_STATUS.IDLE;
+/*  232 */     this.controllerPortMode = CONTROLLER_PORT_MODE.UNKNOWN;
+/*      */     
+/*  234 */     this.readWindowActuallyRead = null;
+/*  235 */     this.readWindowSentToController = null;
+/*  236 */     this.isReadWindowSentToControllerInitialized = false;
+/*      */     
+/*      */ 
+/*  239 */     this.hasReadWindowChanged = true;
+/*      */   }
+/*      */   
+/*      */   public void setI2cAddress(I2cAddr newAddress)
+/*      */   {
+/*  244 */     setI2cAddr(newAddress);
+/*      */   }
+/*      */   
+/*      */   public void setI2cAddr(I2cAddr i2cAddr)
+/*      */   {
+/*  249 */     synchronized (this.engagementLock)
+/*      */     {
+/*  251 */       if (this.i2cAddr.get7Bit() != i2cAddr.get7Bit())
+/*      */       {
+/*  253 */         boolean wasArmed = this.isHooked;
+/*  254 */         disengage();
+/*      */         
+/*  256 */         this.i2cAddr = i2cAddr;
+/*      */         
+/*  258 */         if (wasArmed) engage();
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   public I2cAddr getI2cAddress()
+/*      */   {
+/*  265 */     return getI2cAddr();
+/*      */   }
+/*      */   
+/*      */   /* Error */
+/*      */   public I2cAddr getI2cAddr()
+/*      */   {
+/*      */     // Byte code:
+/*      */     //   0: aload_0
+/*      */     //   1: getfield 3	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:engagementLock	Ljava/lang/Object;
+/*      */     //   4: dup
+/*      */     //   5: astore_1
+/*      */     //   6: monitorenter
+/*      */     //   7: aload_0
+/*      */     //   8: getfield 6	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:i2cAddr	Lcom/qualcomm/robotcore/hardware/I2cAddr;
+/*      */     //   11: aload_1
+/*      */     //   12: monitorexit
+/*      */     //   13: areturn
+/*      */     //   14: astore_2
+/*      */     //   15: aload_1
+/*      */     //   16: monitorexit
+/*      */     //   17: aload_2
+/*      */     //   18: athrow
+/*      */     // Line number table:
+/*      */     //   Java source line #270	-> byte code offset #0
+/*      */     //   Java source line #272	-> byte code offset #7
+/*      */     //   Java source line #273	-> byte code offset #14
+/*      */     // Local variable table:
+/*      */     //   start	length	slot	name	signature
+/*      */     //   0	19	0	this	I2cDeviceSynchImpl
+/*      */     //   5	11	1	Ljava/lang/Object;	Object
+/*      */     //   14	4	2	localObject1	Object
+/*      */     // Exception table:
+/*      */     //   from	to	target	type
+/*      */     //   7	13	14	finally
+/*      */     //   14	17	14	finally
+/*      */   }
+/*      */   
+/*      */   public void engage()
+/*      */   {
+/*  283 */     synchronized (this.engagementLock)
+/*      */     {
+/*  285 */       this.isEngaged = true;
+/*  286 */       adjustHooking();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   protected void hook()
+/*      */   {
+/*  297 */     synchronized (this.engagementLock)
+/*      */     {
+/*  299 */       if (!this.isHooked)
+/*      */       {
+/*  301 */         log(2, "hooking ...");
+/*      */         
+/*  303 */         synchronized (this.callbackLock)
+/*      */         {
+/*  305 */           this.heartbeatExecutor = ThreadPool.newSingleThreadExecutor();
+/*  306 */           this.i2cDevice.registerForI2cPortReadyCallback(this.callback);
+/*      */         }
+/*  308 */         this.isHooked = true;
+/*      */         
+/*  310 */         log(2, "... hooking complete");
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */   protected void adjustHooking()
+/*      */   {
+/*  318 */     synchronized (this.engagementLock)
+/*      */     {
+/*  320 */       if ((!this.isHooked) && (this.isEngaged)) {
+/*  321 */         hook();
+/*  322 */       } else if ((this.isHooked) && (!this.isEngaged)) {
+/*  323 */         unhook();
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   public boolean isEngaged() {
+/*  329 */     return this.isEngaged;
+/*      */   }
+/*      */   
+/*      */   public boolean isArmed()
+/*      */   {
+/*  334 */     synchronized (this.engagementLock)
+/*      */     {
+/*  336 */       if (this.isHooked)
+/*      */       {
+/*  338 */         return this.i2cDevice.isArmed();
+/*      */       }
+/*  340 */       return false;
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   public void disengage()
+/*      */   {
+/*  346 */     synchronized (this.engagementLock)
+/*      */     {
+/*  348 */       this.isEngaged = false;
+/*  349 */       adjustHooking();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   protected void unhook()
+/*      */   {
+/*      */     try {
+/*  356 */       synchronized (this.engagementLock)
+/*      */       {
+/*  358 */         if (this.isHooked)
+/*      */         {
+/*  360 */           log(2, "unhooking ...");
+/*      */           
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*  366 */           this.heartbeatExecutor.shutdown();
+/*  367 */           ThreadPool.awaitTerminationOrExitApplication(this.heartbeatExecutor, 10L, TimeUnit.SECONDS, "I2c Heartbeat", "internal error");
+/*      */           
+/*      */ 
+/*  370 */           disableReadsAndWrites();
+/*  371 */           gracefullyDrainReadersAndWriters();
+/*      */           
+/*  373 */           synchronized (this.callbackLock)
+/*      */           {
+/*      */ 
+/*      */ 
+/*  377 */             waitForWriteCompletionInternal();
+/*      */             
+/*      */ 
+/*      */ 
+/*  381 */             this.heartbeatExecutor = null;
+/*      */             
+/*      */ 
+/*  384 */             this.i2cDevice.deregisterForPortReadyCallback();
+/*      */           }
+/*      */           
+/*  387 */           this.isHooked = false;
+/*  388 */           enableReadsAndWrites();
+/*      */           
+/*  390 */           log(2, "...unhooking complete");
+/*      */         }
+/*      */       }
+/*      */     }
+/*      */     catch (InterruptedException e)
+/*      */     {
+/*  396 */       Thread.currentThread().interrupt();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   protected void disableReadsAndWrites()
+/*      */   {
+/*  402 */     this.readerWriterPreventionCount.incrementAndGet();
+/*      */   }
+/*      */   
+/*      */   protected void enableReadsAndWrites() {
+/*  406 */     this.readerWriterPreventionCount.decrementAndGet();
+/*      */   }
+/*      */   
+/*      */   protected boolean newReadsAndWritesAllowed() {
+/*  410 */     return this.readerWriterPreventionCount.get() == 0;
+/*      */   }
+/*      */   
+/*      */   protected void gracefullyDrainReadersAndWriters()
+/*      */   {
+/*  415 */     boolean interrupted = false;
+/*  416 */     disableReadsAndWrites();
+/*      */     
+/*      */ 
+/*      */     try
+/*      */     {
+/*      */       for (;;)
+/*      */       {
+/*  423 */         if (this.readerWriterGate.writeLock().tryLock(20L, TimeUnit.MILLISECONDS))
+/*      */         {
+/*      */ 
+/*  426 */           this.readerWriterGate.writeLock().unlock();
+/*  427 */           break;
+/*      */         }
+/*      */         
+/*      */       }
+/*      */       
+/*      */ 
+/*      */     }
+/*      */     catch (InterruptedException e)
+/*      */     {
+/*  436 */       interrupted = true;
+/*      */     }
+/*      */     
+/*      */ 
+/*  440 */     if (interrupted) {
+/*  441 */       Thread.currentThread().interrupt();
+/*      */     }
+/*  443 */     Assert.assertTrue(this.readerWriterCount.get() == 0);
+/*  444 */     enableReadsAndWrites();
+/*      */   }
+/*      */   
+/*      */   protected void forceDrainReadersAndWriters()
+/*      */   {
+/*  449 */     boolean interrupted = false;
+/*  450 */     boolean exitLoop = false;
+/*  451 */     disableReadsAndWrites();
+/*      */     
+/*      */     for (;;)
+/*      */     {
+/*  455 */       synchronized (this.callbackLock)
+/*      */       {
+/*      */ 
+/*  458 */         this.writeCacheStatus = WRITE_CACHE_STATUS.IDLE;
+/*      */         
+/*      */ 
+/*  461 */         this.readCacheStatus = READ_CACHE_STATUS.VALID_QUEUED;
+/*  462 */         this.hasReadWindowChanged = false;
+/*  463 */         Assert.assertTrue(readCacheIsValid());
+/*      */         
+/*      */ 
+/*  466 */         this.callbackLock.notifyAll();
+/*      */       }
+/*      */       
+/*  469 */       if (exitLoop) {
+/*      */         break;
+/*      */       }
+/*      */       
+/*      */       try
+/*      */       {
+/*  475 */         if (this.readerWriterGate.writeLock().tryLock(20L, TimeUnit.MILLISECONDS))
+/*      */         {
+/*      */ 
+/*  478 */           this.readerWriterGate.writeLock().unlock();
+/*  479 */           exitLoop = true;
+/*      */ 
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */       }
+/*      */       catch (InterruptedException e)
+/*      */       {
+/*      */ 
+/*  489 */         interrupted = true;
+/*      */       }
+/*      */     }
+/*      */     
+/*  493 */     if (interrupted) {
+/*  494 */       Thread.currentThread().interrupt();
+/*      */     }
+/*      */     
+/*      */ 
+/*  498 */     Assert.assertTrue(this.readerWriterCount.get() == 0);
+/*  499 */     enableReadsAndWrites();
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public HardwareDevice.Manufacturer getManufacturer()
+/*      */   {
+/*  508 */     return this.controller.getManufacturer();
+/*      */   }
+/*      */   
+/*      */   public String getDeviceName()
+/*      */   {
+/*  513 */     return this.i2cDevice.getDeviceName();
+/*      */   }
+/*      */   
+/*      */   public String getConnectionInfo()
+/*      */   {
+/*  518 */     return this.i2cDevice.getConnectionInfo();
+/*      */   }
+/*      */   
+/*      */   public int getVersion()
+/*      */   {
+/*  523 */     return this.i2cDevice.getVersion();
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public void resetDeviceConfigurationForOpMode() {}
+/*      */   
+/*      */ 
+/*      */ 
+/*      */   public void close()
+/*      */   {
+/*  535 */     this.isClosing = true;
+/*  536 */     this.i2cDevice.deregisterForPortReadyBeginEndCallback();
+/*      */     
+/*  538 */     disengage();
+/*      */     
+/*  540 */     if (this.isI2cDeviceOwned) {
+/*  541 */       this.i2cDevice.close();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public void setReadWindow(I2cDeviceSynch.ReadWindow newWindow)
+/*      */   {
+/*  553 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/*  555 */       synchronized (this.callbackLock)
+/*      */       {
+/*  557 */         if ((this.readWindow == null) || (!this.readWindow.canBeUsedToRead()) || (!this.readWindow.mayInitiateSwitchToReadMode()) || (!this.readWindow.sameAsIncludingMode(newWindow)))
+/*      */         {
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*  564 */           setReadWindowInternal(newWindow.readableCopy());
+/*  565 */           Assert.assertTrue((this.readWindow.canBeUsedToRead()) && (this.readWindow.mayInitiateSwitchToReadMode()));
+/*      */         }
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */   protected void setReadWindowInternal(I2cDeviceSynch.ReadWindow newWindow)
+/*      */   {
+/*  574 */     this.readWindow = newWindow;
+/*      */     
+/*      */ 
+/*  577 */     this.hasReadWindowChanged = true;
+/*      */   }
+/*      */   
+/*      */   /* Error */
+/*      */   public I2cDeviceSynch.ReadWindow getReadWindow()
+/*      */   {
+/*      */     // Byte code:
+/*      */     //   0: aload_0
+/*      */     //   1: getfield 4	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:concurrentClientLock	Ljava/lang/Object;
+/*      */     //   4: dup
+/*      */     //   5: astore_1
+/*      */     //   6: monitorenter
+/*      */     //   7: aload_0
+/*      */     //   8: getfield 5	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:callbackLock	Ljava/lang/Object;
+/*      */     //   11: dup
+/*      */     //   12: astore_2
+/*      */     //   13: monitorenter
+/*      */     //   14: aload_0
+/*      */     //   15: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   18: aload_2
+/*      */     //   19: monitorexit
+/*      */     //   20: aload_1
+/*      */     //   21: monitorexit
+/*      */     //   22: areturn
+/*      */     //   23: astore_3
+/*      */     //   24: aload_2
+/*      */     //   25: monitorexit
+/*      */     //   26: aload_3
+/*      */     //   27: athrow
+/*      */     //   28: astore 4
+/*      */     //   30: aload_1
+/*      */     //   31: monitorexit
+/*      */     //   32: aload 4
+/*      */     //   34: athrow
+/*      */     // Line number table:
+/*      */     //   Java source line #585	-> byte code offset #0
+/*      */     //   Java source line #587	-> byte code offset #7
+/*      */     //   Java source line #589	-> byte code offset #14
+/*      */     //   Java source line #590	-> byte code offset #23
+/*      */     //   Java source line #591	-> byte code offset #28
+/*      */     // Local variable table:
+/*      */     //   start	length	slot	name	signature
+/*      */     //   0	35	0	this	I2cDeviceSynchImpl
+/*      */     //   5	26	1	Ljava/lang/Object;	Object
+/*      */     //   12	13	2	Ljava/lang/Object;	Object
+/*      */     //   23	4	3	localObject1	Object
+/*      */     //   28	5	4	localObject2	Object
+/*      */     // Exception table:
+/*      */     //   from	to	target	type
+/*      */     //   14	20	23	finally
+/*      */     //   23	26	23	finally
+/*      */     //   7	22	28	finally
+/*      */     //   23	32	28	finally
+/*      */   }
+/*      */   
+/*      */   public void ensureReadWindow(I2cDeviceSynch.ReadWindow windowNeeded, I2cDeviceSynch.ReadWindow windowToSet)
+/*      */   {
+/*  599 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/*  601 */       synchronized (this.callbackLock)
+/*      */       {
+/*  603 */         if ((this.readWindow == null) || (!this.readWindow.containsWithSameMode(windowNeeded)))
+/*      */         {
+/*  605 */           setReadWindow(windowToSet);
+/*      */         }
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public byte read8(int ireg)
+/*      */   {
+/*  616 */     return read(ireg, 1)[0];
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public byte[] read(int ireg, int creg)
+/*      */   {
+/*  624 */     return readTimeStamped(ireg, creg).data;
+/*      */   }
+/*      */   
+/*      */   /* Error */
+/*      */   public I2cDeviceSynchSimple.TimestampedData readTimeStamped(int ireg, int creg)
+/*      */   {
+/*      */     // Byte code:
+/*      */     //   0: aload_0
+/*      */     //   1: invokevirtual 126	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:acquireReaderLockShared	()V
+/*      */     //   4: aload_0
+/*      */     //   5: invokevirtual 127	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:isOpenForReading	()Z
+/*      */     //   8: ifne +15 -> 23
+/*      */     //   11: iload_1
+/*      */     //   12: iload_2
+/*      */     //   13: invokestatic 128	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:makeFakeData	(II)Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchSimple$TimestampedData;
+/*      */     //   16: astore_3
+/*      */     //   17: aload_0
+/*      */     //   18: invokevirtual 129	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:releaseReaderLockShared	()V
+/*      */     //   21: aload_3
+/*      */     //   22: areturn
+/*      */     //   23: aload_0
+/*      */     //   24: getfield 4	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:concurrentClientLock	Ljava/lang/Object;
+/*      */     //   27: dup
+/*      */     //   28: astore_3
+/*      */     //   29: monitorenter
+/*      */     //   30: aload_0
+/*      */     //   31: getfield 5	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:callbackLock	Ljava/lang/Object;
+/*      */     //   34: dup
+/*      */     //   35: astore 4
+/*      */     //   37: monitorenter
+/*      */     //   38: aload_0
+/*      */     //   39: getfield 60	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:writeCacheStatus	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$WRITE_CACHE_STATUS;
+/*      */     //   42: getstatic 59	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$WRITE_CACHE_STATUS:IDLE	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$WRITE_CACHE_STATUS;
+/*      */     //   45: if_acmpeq +16 -> 61
+/*      */     //   48: aload_0
+/*      */     //   49: getfield 5	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:callbackLock	Ljava/lang/Object;
+/*      */     //   52: ldc2_w 130
+/*      */     //   55: invokevirtual 132	java/lang/Object:wait	(J)V
+/*      */     //   58: goto -20 -> 38
+/*      */     //   61: aload_0
+/*      */     //   62: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   65: astore 5
+/*      */     //   67: aload_0
+/*      */     //   68: invokevirtual 133	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheValidityCurrentOrImminent	()Z
+/*      */     //   71: ifeq +25 -> 96
+/*      */     //   74: aload_0
+/*      */     //   75: getfield 63	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindowActuallyRead	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   78: ifnull +18 -> 96
+/*      */     //   81: aload_0
+/*      */     //   82: getfield 63	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindowActuallyRead	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   85: iload_1
+/*      */     //   86: iload_2
+/*      */     //   87: invokevirtual 134	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:contains	(II)Z
+/*      */     //   90: ifeq +6 -> 96
+/*      */     //   93: goto +86 -> 179
+/*      */     //   96: aload_0
+/*      */     //   97: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   100: ifnull +19 -> 119
+/*      */     //   103: aload_0
+/*      */     //   104: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   107: iload_1
+/*      */     //   108: iload_2
+/*      */     //   109: invokevirtual 134	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:contains	(II)Z
+/*      */     //   112: ifeq +7 -> 119
+/*      */     //   115: iconst_1
+/*      */     //   116: goto +4 -> 120
+/*      */     //   119: iconst_0
+/*      */     //   120: istore 6
+/*      */     //   122: iload 6
+/*      */     //   124: ifeq +23 -> 147
+/*      */     //   127: aload_0
+/*      */     //   128: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   131: invokevirtual 116	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:canBeUsedToRead	()Z
+/*      */     //   134: ifeq +13 -> 147
+/*      */     //   137: aload_0
+/*      */     //   138: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   141: invokevirtual 117	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:mayInitiateSwitchToReadMode	()Z
+/*      */     //   144: ifne +35 -> 179
+/*      */     //   147: iload 6
+/*      */     //   149: ifeq +14 -> 163
+/*      */     //   152: aload_0
+/*      */     //   153: aload_0
+/*      */     //   154: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   157: invokevirtual 122	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:setReadWindow	(Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;)V
+/*      */     //   160: goto +19 -> 179
+/*      */     //   163: aload_0
+/*      */     //   164: new 135	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow
+/*      */     //   167: dup
+/*      */     //   168: iload_1
+/*      */     //   169: iload_2
+/*      */     //   170: getstatic 136	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadMode:ONLY_ONCE	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadMode;
+/*      */     //   173: invokespecial 137	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:<init>	(IILcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadMode;)V
+/*      */     //   176: invokevirtual 122	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:setReadWindow	(Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;)V
+/*      */     //   179: aload_0
+/*      */     //   180: invokevirtual 138	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:waitForValidReadCache	()V
+/*      */     //   183: aload_0
+/*      */     //   184: getfield 51	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheLock	Ljava/util/concurrent/locks/Lock;
+/*      */     //   187: invokeinterface 139 1 0
+/*      */     //   192: aload_0
+/*      */     //   193: getfield 63	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindowActuallyRead	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   196: aload_0
+/*      */     //   197: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   200: invokevirtual 140	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:contains	(Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;)Z
+/*      */     //   203: invokestatic 107	org/firstinspires/ftc/robotcore/internal/Assert:assertTrue	(Z)V
+/*      */     //   206: iload_1
+/*      */     //   207: aload_0
+/*      */     //   208: getfield 63	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindowActuallyRead	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   211: invokevirtual 141	com/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow:getRegisterFirst	()I
+/*      */     //   214: isub
+/*      */     //   215: iconst_4
+/*      */     //   216: iadd
+/*      */     //   217: istore 6
+/*      */     //   219: new 142	com/qualcomm/robotcore/hardware/I2cDeviceSynchSimple$TimestampedData
+/*      */     //   222: dup
+/*      */     //   223: invokespecial 143	com/qualcomm/robotcore/hardware/I2cDeviceSynchSimple$TimestampedData:<init>	()V
+/*      */     //   226: astore 7
+/*      */     //   228: aload 7
+/*      */     //   230: aload_0
+/*      */     //   231: getfield 49	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCache	[B
+/*      */     //   234: iload 6
+/*      */     //   236: iload 6
+/*      */     //   238: iload_2
+/*      */     //   239: iadd
+/*      */     //   240: invokestatic 144	java/util/Arrays:copyOfRange	([BII)[B
+/*      */     //   243: putfield 125	com/qualcomm/robotcore/hardware/I2cDeviceSynchSimple$TimestampedData:data	[B
+/*      */     //   246: aload 7
+/*      */     //   248: aload_0
+/*      */     //   249: getfield 56	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:nanoTimeReadCacheValid	J
+/*      */     //   252: putfield 145	com/qualcomm/robotcore/hardware/I2cDeviceSynchSimple$TimestampedData:nanoTime	J
+/*      */     //   255: aload 7
+/*      */     //   257: astore 8
+/*      */     //   259: aload_0
+/*      */     //   260: getfield 51	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheLock	Ljava/util/concurrent/locks/Lock;
+/*      */     //   263: invokeinterface 106 1 0
+/*      */     //   268: aload_0
+/*      */     //   269: getfield 58	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheStatus	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   272: getstatic 146	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS:VALID_ONLYONCE	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   275: if_acmpne +10 -> 285
+/*      */     //   278: aload_0
+/*      */     //   279: getstatic 57	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS:IDLE	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   282: putfield 58	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheStatus	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   285: aload_0
+/*      */     //   286: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   289: aload 5
+/*      */     //   291: if_acmpeq +9 -> 300
+/*      */     //   294: aload_0
+/*      */     //   295: aload 5
+/*      */     //   297: invokevirtual 120	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:setReadWindowInternal	(Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;)V
+/*      */     //   300: aload 4
+/*      */     //   302: monitorexit
+/*      */     //   303: aload_3
+/*      */     //   304: monitorexit
+/*      */     //   305: aload_0
+/*      */     //   306: invokevirtual 129	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:releaseReaderLockShared	()V
+/*      */     //   309: aload 8
+/*      */     //   311: areturn
+/*      */     //   312: astore 9
+/*      */     //   314: aload_0
+/*      */     //   315: getfield 51	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheLock	Ljava/util/concurrent/locks/Lock;
+/*      */     //   318: invokeinterface 106 1 0
+/*      */     //   323: aload_0
+/*      */     //   324: getfield 58	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheStatus	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   327: getstatic 146	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS:VALID_ONLYONCE	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   330: if_acmpne +10 -> 340
+/*      */     //   333: aload_0
+/*      */     //   334: getstatic 57	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS:IDLE	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   337: putfield 58	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readCacheStatus	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchImpl$READ_CACHE_STATUS;
+/*      */     //   340: aload_0
+/*      */     //   341: getfield 38	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*      */     //   344: aload 5
+/*      */     //   346: if_acmpeq +9 -> 355
+/*      */     //   349: aload_0
+/*      */     //   350: aload 5
+/*      */     //   352: invokevirtual 120	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:setReadWindowInternal	(Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;)V
+/*      */     //   355: aload 9
+/*      */     //   357: athrow
+/*      */     //   358: astore 10
+/*      */     //   360: aload 4
+/*      */     //   362: monitorexit
+/*      */     //   363: aload 10
+/*      */     //   365: athrow
+/*      */     //   366: astore 11
+/*      */     //   368: aload_3
+/*      */     //   369: monitorexit
+/*      */     //   370: aload 11
+/*      */     //   372: athrow
+/*      */     //   373: astore 12
+/*      */     //   375: aload_0
+/*      */     //   376: invokevirtual 129	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:releaseReaderLockShared	()V
+/*      */     //   379: aload 12
+/*      */     //   381: athrow
+/*      */     //   382: astore_3
+/*      */     //   383: invokestatic 96	java/lang/Thread:currentThread	()Ljava/lang/Thread;
+/*      */     //   386: invokevirtual 97	java/lang/Thread:interrupt	()V
+/*      */     //   389: iload_1
+/*      */     //   390: iload_2
+/*      */     //   391: invokestatic 128	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:makeFakeData	(II)Lcom/qualcomm/robotcore/hardware/I2cDeviceSynchSimple$TimestampedData;
+/*      */     //   394: areturn
+/*      */     // Line number table:
+/*      */     //   Java source line #639	-> byte code offset #0
+/*      */     //   Java source line #641	-> byte code offset #4
+/*      */     //   Java source line #642	-> byte code offset #11
+/*      */     //   Java source line #731	-> byte code offset #17
+/*      */     //   Java source line #644	-> byte code offset #23
+/*      */     //   Java source line #646	-> byte code offset #30
+/*      */     //   Java source line #651	-> byte code offset #38
+/*      */     //   Java source line #653	-> byte code offset #48
+/*      */     //   Java source line #657	-> byte code offset #61
+/*      */     //   Java source line #660	-> byte code offset #67
+/*      */     //   Java source line #673	-> byte code offset #96
+/*      */     //   Java source line #675	-> byte code offset #122
+/*      */     //   Java source line #680	-> byte code offset #147
+/*      */     //   Java source line #683	-> byte code offset #152
+/*      */     //   Java source line #689	-> byte code offset #163
+/*      */     //   Java source line #695	-> byte code offset #179
+/*      */     //   Java source line #698	-> byte code offset #183
+/*      */     //   Java source line #701	-> byte code offset #192
+/*      */     //   Java source line #704	-> byte code offset #206
+/*      */     //   Java source line #705	-> byte code offset #219
+/*      */     //   Java source line #706	-> byte code offset #228
+/*      */     //   Java source line #707	-> byte code offset #246
+/*      */     //   Java source line #708	-> byte code offset #255
+/*      */     //   Java source line #712	-> byte code offset #259
+/*      */     //   Java source line #717	-> byte code offset #268
+/*      */     //   Java source line #718	-> byte code offset #278
+/*      */     //   Java source line #721	-> byte code offset #285
+/*      */     //   Java source line #723	-> byte code offset #294
+/*      */     //   Java source line #731	-> byte code offset #305
+/*      */     //   Java source line #712	-> byte code offset #312
+/*      */     //   Java source line #717	-> byte code offset #323
+/*      */     //   Java source line #718	-> byte code offset #333
+/*      */     //   Java source line #721	-> byte code offset #340
+/*      */     //   Java source line #723	-> byte code offset #349
+/*      */     //   Java source line #726	-> byte code offset #358
+/*      */     //   Java source line #727	-> byte code offset #366
+/*      */     //   Java source line #731	-> byte code offset #373
+/*      */     //   Java source line #734	-> byte code offset #382
+/*      */     //   Java source line #736	-> byte code offset #383
+/*      */     //   Java source line #737	-> byte code offset #389
+/*      */     // Local variable table:
+/*      */     //   start	length	slot	name	signature
+/*      */     //   0	395	0	this	I2cDeviceSynchImpl
+/*      */     //   0	395	1	ireg	int
+/*      */     //   0	395	2	creg	int
+/*      */     //   382	2	3	e	InterruptedException
+/*      */     //   65	286	5	prevReadWindow	I2cDeviceSynch.ReadWindow
+/*      */     //   120	28	6	readWindowRangeOk	boolean
+/*      */     //   217	20	6	ibFirst	int
+/*      */     //   226	30	7	result	I2cDeviceSynchSimple.TimestampedData
+/*      */     //   257	53	8	localTimestampedData2	I2cDeviceSynchSimple.TimestampedData
+/*      */     //   312	44	9	localObject1	Object
+/*      */     //   358	6	10	localObject2	Object
+/*      */     //   366	5	11	localObject3	Object
+/*      */     //   373	7	12	localObject4	Object
+/*      */     // Exception table:
+/*      */     //   from	to	target	type
+/*      */     //   192	259	312	finally
+/*      */     //   312	314	312	finally
+/*      */     //   38	303	358	finally
+/*      */     //   312	363	358	finally
+/*      */     //   30	305	366	finally
+/*      */     //   312	370	366	finally
+/*      */     //   4	17	373	finally
+/*      */     //   23	305	373	finally
+/*      */     //   312	375	373	finally
+/*      */     //   0	21	382	java/lang/InterruptedException
+/*      */     //   23	309	382	java/lang/InterruptedException
+/*      */     //   312	382	382	java/lang/InterruptedException
+/*      */   }
+/*      */   
+/*      */   protected boolean isOpenForReading()
+/*      */   {
+/*  743 */     return (this.isHooked) && (newReadsAndWritesAllowed());
+/*      */   }
+/*      */   
+/*      */   protected boolean isOpenForWriting() {
+/*  747 */     return (this.isHooked) && (newReadsAndWritesAllowed());
+/*      */   }
+/*      */   
+/*      */   protected void acquireReaderLockShared() throws InterruptedException {
+/*  751 */     this.readerWriterGate.readLock().lockInterruptibly();
+/*  752 */     this.readerWriterCount.incrementAndGet();
+/*      */   }
+/*      */   
+/*      */   protected void releaseReaderLockShared() {
+/*  756 */     this.readerWriterCount.decrementAndGet();
+/*  757 */     this.readerWriterGate.readLock().unlock();
+/*      */   }
+/*      */   
+/*      */   public static I2cDeviceSynchSimple.TimestampedData makeFakeData(int ireg, int creg)
+/*      */   {
+/*  762 */     I2cDeviceSynchSimple.TimestampedData result = new I2cDeviceSynchSimple.TimestampedData();
+/*  763 */     result.data = new byte[creg];
+/*  764 */     result.nanoTime = System.nanoTime();
+/*  765 */     return result;
+/*      */   }
+/*      */   
+/*      */   public I2cDeviceSynchSimple.TimestampedData readTimeStamped(int ireg, int creg, I2cDeviceSynch.ReadWindow readWindowNeeded, I2cDeviceSynch.ReadWindow readWindowSet)
+/*      */   {
+/*  770 */     ensureReadWindow(readWindowNeeded, readWindowSet);
+/*  771 */     return readTimeStamped(ireg, creg);
+/*      */   }
+/*      */   
+/*      */   protected boolean readCacheValidityCurrentOrImminent()
+/*      */   {
+/*  776 */     return (this.readCacheStatus != READ_CACHE_STATUS.IDLE) && (!this.hasReadWindowChanged);
+/*      */   }
+/*      */   
+/*      */   protected boolean readCacheIsValid() {
+/*  780 */     return (this.readCacheStatus.isValid()) && (!this.hasReadWindowChanged);
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public void write8(int ireg, int data)
+/*      */   {
+/*  788 */     write(ireg, new byte[] { (byte)data });
+/*      */   }
+/*      */   
+/*      */   public void write8(int ireg, int data, boolean waitforCompletion) {
+/*  792 */     write(ireg, new byte[] { (byte)data }, waitforCompletion);
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   public void write(int ireg, byte[] data)
+/*      */   {
+/*  803 */     write(ireg, data, true);
+/*      */   }
+/*      */   
+/*      */   public void write(int ireg, byte[] data, boolean waitForCompletion)
+/*      */   {
+/*      */     try
+/*      */     {
+/*  810 */       acquireReaderLockShared();
+/*      */       try {
+/*  812 */         if (!isOpenForWriting()) {
+/*      */           return;
+/*      */         }
+/*  815 */         synchronized (this.concurrentClientLock)
+/*      */         {
+/*  817 */           if (data.length > 26) {
+/*  818 */             throw new IllegalArgumentException(String.format("write request of %d bytes is too large; max is %d", new Object[] { Integer.valueOf(data.length), Integer.valueOf(26) }));
+/*      */           }
+/*  820 */           synchronized (this.callbackLock)
+/*      */           {
+/*      */ 
+/*  823 */             boolean doCoalesce = false;
+/*  824 */             if ((this.isWriteCoalescingEnabled) && (this.writeCacheStatus == WRITE_CACHE_STATUS.DIRTY) && (this.cregWrite + data.length <= 26))
+/*      */             {
+/*      */ 
+/*      */ 
+/*  828 */               if (ireg + data.length == this.iregWriteFirst)
+/*      */               {
+/*      */ 
+/*      */ 
+/*  832 */                 data = concatenateByteArrays(data, readWriteCache());
+/*  833 */                 doCoalesce = true;
+/*      */               }
+/*  835 */               else if (this.iregWriteFirst + this.cregWrite == ireg)
+/*      */               {
+/*      */ 
+/*  838 */                 ireg = this.iregWriteFirst;
+/*  839 */                 data = concatenateByteArrays(readWriteCache(), data);
+/*  840 */                 doCoalesce = true;
+/*      */               }
+/*      */             }
+/*      */             
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*  848 */             if (!doCoalesce)
+/*      */             {
+/*  850 */               waitForIdleWriteCache();
+/*      */             }
+/*      */             
+/*      */ 
+/*  854 */             this.iregWriteFirst = ireg;
+/*  855 */             this.cregWrite = data.length;
+/*      */             
+/*      */ 
+/*  858 */             setWriteCacheStatusIfHooked(WRITE_CACHE_STATUS.DIRTY);
+/*      */             
+/*      */ 
+/*  861 */             this.writeCacheLock.lock();
+/*      */             try
+/*      */             {
+/*  864 */               System.arraycopy(data, 0, this.writeCache, 4, data.length);
+/*      */             }
+/*      */             finally
+/*      */             {
+/*  868 */               this.writeCacheLock.unlock();
+/*      */             }
+/*      */             
+/*  871 */             if (!waitForCompletion) {}
+/*      */ 
+/*      */           }
+/*      */           
+/*      */ 
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */       }
+/*      */       finally
+/*      */       {
+/*      */ 
+/*      */ 
+/*  885 */         releaseReaderLockShared();
+/*      */       }
+/*      */     }
+/*      */     catch (InterruptedException e)
+/*      */     {
+/*  890 */       Thread.currentThread().interrupt();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   protected static byte[] concatenateByteArrays(byte[] left, byte[] right)
+/*      */   {
+/*  896 */     byte[] result = new byte[left.length + right.length];
+/*  897 */     System.arraycopy(left, 0, result, 0, left.length);
+/*  898 */     System.arraycopy(right, 0, result, left.length, right.length);
+/*  899 */     return result;
+/*      */   }
+/*      */   
+/*      */   public void waitForWriteCompletions()
+/*      */   {
+/*      */     try {
+/*  905 */       synchronized (this.concurrentClientLock)
+/*      */       {
+/*  907 */         synchronized (this.callbackLock)
+/*      */         {
+/*  909 */           waitForWriteCompletionInternal();
+/*      */         }
+/*      */       }
+/*      */     }
+/*      */     catch (InterruptedException e)
+/*      */     {
+/*  915 */       Thread.currentThread().interrupt();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */   protected byte[] readWriteCache()
+/*      */   {
+/*  922 */     this.writeCacheLock.lock();
+/*      */     try {
+/*  924 */       return Arrays.copyOfRange(this.writeCache, 4, 4 + this.cregWrite);
+/*      */     }
+/*      */     finally
+/*      */     {
+/*  928 */       this.writeCacheLock.unlock();
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   protected void waitForWriteCompletionInternal() throws InterruptedException
+/*      */   {
+/*  934 */     waitForIdleWriteCache();
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */   protected void waitForIdleWriteCache()
+/*      */     throws InterruptedException
+/*      */   {
+/*  942 */     ElapsedTime timer = null;
+/*  943 */     while (this.writeCacheStatus != WRITE_CACHE_STATUS.IDLE)
+/*      */     {
+/*  945 */       if (timer == null) timer = new ElapsedTime();
+/*  946 */       if (timer.milliseconds() > 500.0D)
+/*  947 */         throw new InterruptedException();
+/*  948 */       this.callbackLock.wait(60L);
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   protected void waitForValidReadCache()
+/*      */     throws InterruptedException
+/*      */   {
+/*  955 */     ElapsedTime timer = null;
+/*  956 */     while (!readCacheIsValid())
+/*      */     {
+/*  958 */       if (timer == null) timer = new ElapsedTime();
+/*  959 */       if (timer.milliseconds() > 500.0D)
+/*  960 */         throw new InterruptedException();
+/*  961 */       this.callbackLock.wait(60L);
+/*      */     }
+/*      */   }
+/*      */   
+/*      */ 
+/*      */   void setWriteCacheStatusIfHooked(WRITE_CACHE_STATUS status)
+/*      */   {
+/*  968 */     if ((this.isHooked) && (newReadsAndWritesAllowed())) {
+/*  969 */       this.writeCacheStatus = status;
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   public void enableWriteCoalescing(boolean enable)
+/*      */   {
+/*  975 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/*  977 */       this.isWriteCoalescingEnabled = enable;
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   /* Error */
+/*      */   public boolean isWriteCoalescingEnabled()
+/*      */   {
+/*      */     // Byte code:
+/*      */     //   0: aload_0
+/*      */     //   1: getfield 4	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:concurrentClientLock	Ljava/lang/Object;
+/*      */     //   4: dup
+/*      */     //   5: astore_1
+/*      */     //   6: monitorenter
+/*      */     //   7: aload_0
+/*      */     //   8: getfield 37	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:isWriteCoalescingEnabled	Z
+/*      */     //   11: aload_1
+/*      */     //   12: monitorexit
+/*      */     //   13: ireturn
+/*      */     //   14: astore_2
+/*      */     //   15: aload_1
+/*      */     //   16: monitorexit
+/*      */     //   17: aload_2
+/*      */     //   18: athrow
+/*      */     // Line number table:
+/*      */     //   Java source line #984	-> byte code offset #0
+/*      */     //   Java source line #986	-> byte code offset #7
+/*      */     //   Java source line #987	-> byte code offset #14
+/*      */     // Local variable table:
+/*      */     //   start	length	slot	name	signature
+/*      */     //   0	19	0	this	I2cDeviceSynchImpl
+/*      */     //   5	11	1	Ljava/lang/Object;	Object
+/*      */     //   14	4	2	localObject1	Object
+/*      */     // Exception table:
+/*      */     //   from	to	target	type
+/*      */     //   7	13	14	finally
+/*      */     //   14	17	14	finally
+/*      */   }
+/*      */   
+/*      */   public void setLogging(boolean enabled)
+/*      */   {
+/*  992 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/*  994 */       synchronized (this.callbackLock)
+/*      */       {
+/*  996 */         this.loggingEnabled = enabled;
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   public void setLoggingTag(String loggingTag)
+/*      */   {
+/* 1003 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/* 1005 */       synchronized (this.callbackLock)
+/*      */       {
+/* 1007 */         this.loggingTag = (loggingTag + "I2C");
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   /* Error */
+/*      */   public int getHeartbeatInterval()
+/*      */   {
+/*      */     // Byte code:
+/*      */     //   0: aload_0
+/*      */     //   1: getfield 4	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:concurrentClientLock	Ljava/lang/Object;
+/*      */     //   4: dup
+/*      */     //   5: astore_1
+/*      */     //   6: monitorenter
+/*      */     //   7: aload_0
+/*      */     //   8: getfield 5	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:callbackLock	Ljava/lang/Object;
+/*      */     //   11: dup
+/*      */     //   12: astore_2
+/*      */     //   13: monitorenter
+/*      */     //   14: aload_0
+/*      */     //   15: getfield 34	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:msHeartbeatInterval	I
+/*      */     //   18: aload_2
+/*      */     //   19: monitorexit
+/*      */     //   20: aload_1
+/*      */     //   21: monitorexit
+/*      */     //   22: ireturn
+/*      */     //   23: astore_3
+/*      */     //   24: aload_2
+/*      */     //   25: monitorexit
+/*      */     //   26: aload_3
+/*      */     //   27: athrow
+/*      */     //   28: astore 4
+/*      */     //   30: aload_1
+/*      */     //   31: monitorexit
+/*      */     //   32: aload 4
+/*      */     //   34: athrow
+/*      */     // Line number table:
+/*      */     //   Java source line #1014	-> byte code offset #0
+/*      */     //   Java source line #1016	-> byte code offset #7
+/*      */     //   Java source line #1018	-> byte code offset #14
+/*      */     //   Java source line #1019	-> byte code offset #23
+/*      */     //   Java source line #1020	-> byte code offset #28
+/*      */     // Local variable table:
+/*      */     //   start	length	slot	name	signature
+/*      */     //   0	35	0	this	I2cDeviceSynchImpl
+/*      */     //   5	26	1	Ljava/lang/Object;	Object
+/*      */     //   12	13	2	Ljava/lang/Object;	Object
+/*      */     //   23	4	3	localObject1	Object
+/*      */     //   28	5	4	localObject2	Object
+/*      */     // Exception table:
+/*      */     //   from	to	target	type
+/*      */     //   14	20	23	finally
+/*      */     //   23	26	23	finally
+/*      */     //   7	22	28	finally
+/*      */     //   23	32	28	finally
+/*      */   }
+/*      */   
+/*      */   public void setHeartbeatInterval(int msHeartbeatInterval)
+/*      */   {
+/* 1025 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/* 1027 */       synchronized (this.callbackLock)
+/*      */       {
+/* 1029 */         this.msHeartbeatInterval = Math.max(0, msHeartbeatInterval);
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   public void setHeartbeatAction(I2cDeviceSynch.HeartbeatAction action)
+/*      */   {
+/* 1036 */     synchronized (this.concurrentClientLock)
+/*      */     {
+/* 1038 */       synchronized (this.callbackLock)
+/*      */       {
+/* 1040 */         this.heartbeatAction = action;
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   /* Error */
+/*      */   public I2cDeviceSynch.HeartbeatAction getHeartbeatAction()
+/*      */   {
+/*      */     // Byte code:
+/*      */     //   0: aload_0
+/*      */     //   1: getfield 4	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:concurrentClientLock	Ljava/lang/Object;
+/*      */     //   4: dup
+/*      */     //   5: astore_1
+/*      */     //   6: monitorenter
+/*      */     //   7: aload_0
+/*      */     //   8: getfield 5	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:callbackLock	Ljava/lang/Object;
+/*      */     //   11: dup
+/*      */     //   12: astore_2
+/*      */     //   13: monitorenter
+/*      */     //   14: aload_0
+/*      */     //   15: getfield 35	com/qualcomm/robotcore/hardware/I2cDeviceSynchImpl:heartbeatAction	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$HeartbeatAction;
+/*      */     //   18: aload_2
+/*      */     //   19: monitorexit
+/*      */     //   20: aload_1
+/*      */     //   21: monitorexit
+/*      */     //   22: areturn
+/*      */     //   23: astore_3
+/*      */     //   24: aload_2
+/*      */     //   25: monitorexit
+/*      */     //   26: aload_3
+/*      */     //   27: athrow
+/*      */     //   28: astore 4
+/*      */     //   30: aload_1
+/*      */     //   31: monitorexit
+/*      */     //   32: aload 4
+/*      */     //   34: athrow
+/*      */     // Line number table:
+/*      */     //   Java source line #1047	-> byte code offset #0
+/*      */     //   Java source line #1049	-> byte code offset #7
+/*      */     //   Java source line #1051	-> byte code offset #14
+/*      */     //   Java source line #1052	-> byte code offset #23
+/*      */     //   Java source line #1053	-> byte code offset #28
+/*      */     // Local variable table:
+/*      */     //   start	length	slot	name	signature
+/*      */     //   0	35	0	this	I2cDeviceSynchImpl
+/*      */     //   5	26	1	Ljava/lang/Object;	Object
+/*      */     //   12	13	2	Ljava/lang/Object;	Object
+/*      */     //   23	4	3	localObject1	Object
+/*      */     //   28	5	4	localObject2	Object
+/*      */     // Exception table:
+/*      */     //   from	to	target	type
+/*      */     //   14	20	23	finally
+/*      */     //   23	26	23	finally
+/*      */     //   7	22	28	finally
+/*      */     //   23	32	28	finally
+/*      */   }
+/*      */   
+/*      */   protected void log(int verbosity, String message)
+/*      */   {
+/* 1058 */     switch (verbosity) {
+/*      */     case 2: 
+/* 1060 */       Log.v(this.loggingTag, message); break;
+/* 1061 */     case 3:  Log.d(this.loggingTag, message); break;
+/* 1062 */     case 4:  Log.i(this.loggingTag, message); break;
+/* 1063 */     case 5:  Log.w(this.loggingTag, message); break;
+/* 1064 */     case 6:  Log.e(this.loggingTag, message); break;
+/* 1065 */     case 7:  Log.wtf(this.loggingTag, message);
+/*      */     }
+/*      */   }
+/*      */   
+/*      */   protected void log(int verbosity, String format, Object... args) {
+/* 1070 */     log(verbosity, String.format(format, args));
+/*      */   }
+/*      */   
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */   protected class Callback
+/*      */     implements I2cController.I2cPortReadyCallback, I2cController.I2cPortReadyBeginEndNotifications, RobotArmingStateNotifier.Callback
+/*      */   {
+/* 1080 */     protected boolean setActionFlag = false;
+/* 1081 */     protected boolean queueFullWrite = false;
+/* 1082 */     protected boolean queueRead = false;
+/* 1083 */     protected boolean heartbeatRequired = false;
+/* 1084 */     protected boolean enabledReadMode = false;
+/* 1085 */     protected boolean enabledWriteMode = false;
+/*      */     
+/* 1087 */     protected I2cDeviceSynchImpl.READ_CACHE_STATUS prevReadCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.IDLE;
+/* 1088 */     protected I2cDeviceSynchImpl.WRITE_CACHE_STATUS prevWriteCacheStatus = I2cDeviceSynchImpl.WRITE_CACHE_STATUS.IDLE;
+/*      */     
+/* 1090 */     protected boolean doModuleIsArmedWorkEnabledWrites = false;
+/* 1091 */     protected boolean haveSeenModuleIsArmedWork = false;
+/*      */     
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */     protected Callback() {}
+/*      */     
+/*      */ 
+/*      */ 
+/*      */     public void portIsReady(int port)
+/*      */     {
+/* 1102 */       updateStateMachines();
+/*      */     }
+/*      */     
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */     public void onModuleStateChange(RobotArmingStateNotifier robotUsbModule, RobotArmingStateNotifier.ARMINGSTATE armingstate)
+/*      */     {
+/* 1112 */       switch (I2cDeviceSynchImpl.1.$SwitchMap$com$qualcomm$robotcore$hardware$usb$RobotArmingStateNotifier$ARMINGSTATE[armingstate.ordinal()])
+/*      */       {
+/*      */       case 1: 
+/* 1115 */         I2cDeviceSynchImpl.this.log(2, "onArmed ...");
+/* 1116 */         doModuleIsArmedWork(true);
+/* 1117 */         I2cDeviceSynchImpl.this.log(2, "... onArmed");
+/* 1118 */         break;
+/*      */       case 2: 
+/* 1120 */         I2cDeviceSynchImpl.this.log(2, "onPretending ...");
+/* 1121 */         doModuleIsArmedWork(false);
+/* 1122 */         I2cDeviceSynchImpl.this.log(2, "... onPretending");
+/* 1123 */         break;
+/*      */       }
+/*      */       
+/*      */     }
+/*      */     
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */     public void onPortIsReadyCallbacksBegin(int port)
+/*      */     {
+/* 1140 */       I2cDeviceSynchImpl.this.log(2, "doPortIsReadyCallbackBeginWork ...");
+/*      */       try {
+/* 1142 */         switch (I2cDeviceSynchImpl.1.$SwitchMap$com$qualcomm$robotcore$hardware$usb$RobotArmingStateNotifier$ARMINGSTATE[I2cDeviceSynchImpl.this.robotUsbModule.getArmingState().ordinal()])
+/*      */         {
+/*      */         case 1: 
+/* 1145 */           doModuleIsArmedWork(true);
+/* 1146 */           break;
+/*      */         case 2: 
+/* 1148 */           doModuleIsArmedWork(false);
+/*      */         }
+/*      */         
+/*      */       }
+/*      */       finally
+/*      */       {
+/* 1154 */         I2cDeviceSynchImpl.this.log(2, "... doPortIsReadyCallbackBeginWork complete");
+/*      */       }
+/*      */     }
+/*      */     
+/*      */     protected void doModuleIsArmedWork(boolean arming)
+/*      */     {
+/*      */       try {
+/* 1161 */         I2cDeviceSynchImpl.this.log(2, "doModuleIsArmedWork ...");
+/* 1162 */         synchronized (I2cDeviceSynchImpl.this.engagementLock)
+/*      */         {
+/* 1164 */           I2cDeviceSynchImpl.this.disableReadsAndWrites();
+/* 1165 */           I2cDeviceSynchImpl.this.forceDrainReadersAndWriters();
+/* 1166 */           I2cDeviceSynchImpl.this.unhook();
+/*      */           
+/*      */ 
+/* 1169 */           I2cDeviceSynchImpl.this.attachToController();
+/*      */           
+/* 1171 */           I2cDeviceSynchImpl.this.adjustHooking();
+/*      */           
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1181 */           if (arming)
+/*      */           {
+/* 1183 */             I2cDeviceSynchImpl.this.enableReadsAndWrites();
+/* 1184 */             this.doModuleIsArmedWorkEnabledWrites = true;
+/*      */           }
+/*      */           else {
+/* 1187 */             this.doModuleIsArmedWorkEnabledWrites = false;
+/*      */           }
+/* 1189 */           this.haveSeenModuleIsArmedWork = true;
+/*      */         }
+/*      */       }
+/*      */       finally
+/*      */       {
+/* 1194 */         I2cDeviceSynchImpl.this.log(2, "... doModuleIsArmedWork complete");
+/*      */       }
+/*      */     }
+/*      */     
+/*      */     public void onPortIsReadyCallbacksEnd(int port)
+/*      */     {
+/*      */       try
+/*      */       {
+/* 1202 */         I2cDeviceSynchImpl.this.log(2, "onPortIsReadyCallbacksEnd ...");
+/*      */         
+/* 1204 */         if (I2cDeviceSynchImpl.this.isClosing) {
+/*      */           return;
+/*      */         }
+/* 1207 */         if (!this.haveSeenModuleIsArmedWork) {
+/*      */           return;
+/*      */         }
+/* 1210 */         synchronized (I2cDeviceSynchImpl.this.engagementLock)
+/*      */         {
+/* 1212 */           if (this.doModuleIsArmedWorkEnabledWrites)
+/*      */           {
+/* 1214 */             I2cDeviceSynchImpl.this.disableReadsAndWrites();
+/*      */           }
+/*      */           
+/* 1217 */           I2cDeviceSynchImpl.this.forceDrainReadersAndWriters();
+/* 1218 */           I2cDeviceSynchImpl.this.unhook();
+/* 1219 */           Assert.assertTrue((!I2cDeviceSynchImpl.this.isOpenForReading()) && (!I2cDeviceSynchImpl.this.isOpenForWriting()));
+/* 1220 */           I2cDeviceSynchImpl.this.enableReadsAndWrites();
+/*      */           
+/* 1222 */           this.haveSeenModuleIsArmedWork = false;
+/*      */         }
+/*      */       }
+/*      */       finally
+/*      */       {
+/* 1227 */         I2cDeviceSynchImpl.this.log(2, "... onPortIsReadyCallbacksEnd complete");
+/*      */       }
+/*      */     }
+/*      */     
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */     protected void startSwitchingToReadMode(I2cDeviceSynch.ReadWindow window)
+/*      */     {
+/* 1237 */       I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.SWITCHINGTOREADMODE;
+/*      */       
+/* 1239 */       I2cDeviceSynchImpl.this.i2cDevice.enableI2cReadMode(I2cDeviceSynchImpl.this.i2cAddr, window.getRegisterFirst(), window.getRegisterCount());
+/* 1240 */       this.enabledReadMode = true;
+/*      */       
+/*      */ 
+/* 1243 */       I2cDeviceSynchImpl.this.readWindowSentToController = window;
+/* 1244 */       I2cDeviceSynchImpl.this.isReadWindowSentToControllerInitialized = true;
+/*      */       
+/* 1246 */       this.setActionFlag = true;
+/* 1247 */       this.queueFullWrite = true;
+/*      */     }
+/*      */     
+/*      */ 
+/*      */     protected void issueWrite()
+/*      */     {
+/* 1253 */       I2cDeviceSynchImpl.this.setWriteCacheStatusIfHooked(I2cDeviceSynchImpl.WRITE_CACHE_STATUS.QUEUED);
+/*      */       
+/* 1255 */       I2cDeviceSynchImpl.this.i2cDevice.enableI2cWriteMode(I2cDeviceSynchImpl.this.i2cAddr, I2cDeviceSynchImpl.this.iregWriteFirst, I2cDeviceSynchImpl.this.cregWrite);
+/* 1256 */       this.enabledWriteMode = true;
+/*      */       
+/*      */ 
+/* 1259 */       I2cDeviceSynchImpl.this.readWindowSentToController = null;
+/* 1260 */       I2cDeviceSynchImpl.this.isReadWindowSentToControllerInitialized = true;
+/*      */       
+/* 1262 */       this.setActionFlag = true;
+/* 1263 */       this.queueFullWrite = true;
+/*      */     }
+/*      */     
+/*      */ 
+/*      */ 
+/*      */     protected boolean isControllerPortInReadMode()
+/*      */     {
+/* 1270 */       return I2cDeviceSynchImpl.this.controllerPortMode == I2cDeviceSynchImpl.CONTROLLER_PORT_MODE.READ;
+/*      */     }
+/*      */     
+/*      */ 
+/*      */     protected void updateStateMachines()
+/*      */     {
+/* 1276 */       synchronized (I2cDeviceSynchImpl.this.callbackLock)
+/*      */       {
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1281 */         this.setActionFlag = false;
+/* 1282 */         this.queueFullWrite = false;
+/* 1283 */         this.queueRead = false;
+/* 1284 */         this.heartbeatRequired = ((I2cDeviceSynchImpl.this.msHeartbeatInterval > 0) && (I2cDeviceSynchImpl.this.timeSinceLastHeartbeat.milliseconds() >= I2cDeviceSynchImpl.this.msHeartbeatInterval));
+/* 1285 */         this.enabledReadMode = false;
+/* 1286 */         this.enabledWriteMode = false;
+/*      */         
+/* 1288 */         this.prevReadCacheStatus = I2cDeviceSynchImpl.this.readCacheStatus;
+/* 1289 */         this.prevWriteCacheStatus = I2cDeviceSynchImpl.this.writeCacheStatus;
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1299 */         if (I2cDeviceSynchImpl.this.controllerPortMode == I2cDeviceSynchImpl.CONTROLLER_PORT_MODE.SWITCHINGTOREADMODE) {
+/* 1300 */           I2cDeviceSynchImpl.this.controllerPortMode = I2cDeviceSynchImpl.CONTROLLER_PORT_MODE.READ;
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/* 1305 */         if ((I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.QUEUED) || (I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.VALID_QUEUED))
+/*      */         {
+/* 1307 */           I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.QUEUE_COMPLETED;
+/* 1308 */           I2cDeviceSynchImpl.this.nanoTimeReadCacheValid = System.nanoTime();
+/*      */         }
+/*      */         
+/* 1311 */         if (I2cDeviceSynchImpl.this.writeCacheStatus == I2cDeviceSynchImpl.WRITE_CACHE_STATUS.QUEUED)
+/*      */         {
+/* 1313 */           I2cDeviceSynchImpl.this.writeCacheStatus = I2cDeviceSynchImpl.WRITE_CACHE_STATUS.IDLE;
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1331 */         Assert.assertTrue((I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.IDLE) || (I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.SWITCHINGTOREADMODE) || (I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.VALID_ONLYONCE) || (I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.QUEUE_COMPLETED));
+/*      */         
+/*      */ 
+/*      */ 
+/* 1335 */         Assert.assertTrue((I2cDeviceSynchImpl.this.writeCacheStatus == I2cDeviceSynchImpl.WRITE_CACHE_STATUS.IDLE) || (I2cDeviceSynchImpl.this.writeCacheStatus == I2cDeviceSynchImpl.WRITE_CACHE_STATUS.DIRTY));
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1340 */         if (I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.SWITCHINGTOREADMODE)
+/*      */         {
+/*      */ 
+/* 1343 */           if (isControllerPortInReadMode())
+/*      */           {
+/*      */ 
+/* 1346 */             I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.QUEUED;
+/* 1347 */             this.setActionFlag = true;
+/* 1348 */             this.queueRead = true;
+/*      */           }
+/*      */           else
+/*      */           {
+/* 1352 */             this.queueRead = true;
+/*      */ 
+/*      */           }
+/*      */           
+/*      */ 
+/*      */ 
+/*      */         }
+/* 1359 */         else if (I2cDeviceSynchImpl.this.writeCacheStatus == I2cDeviceSynchImpl.WRITE_CACHE_STATUS.DIRTY)
+/*      */         {
+/* 1361 */           issueWrite();
+/*      */           
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1366 */           I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.IDLE;
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */         }
+/* 1372 */         else if ((I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.IDLE) || (I2cDeviceSynchImpl.this.hasReadWindowChanged))
+/*      */         {
+/* 1374 */           boolean issuedRead = false;
+/* 1375 */           if (I2cDeviceSynchImpl.this.readWindow != null)
+/*      */           {
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1380 */             boolean readSwitchUnnecessary = (I2cDeviceSynchImpl.this.readWindowSentToController != null) && (I2cDeviceSynchImpl.this.readWindowSentToController.contains(I2cDeviceSynchImpl.this.readWindow)) && (isControllerPortInReadMode());
+/*      */             
+/*      */ 
+/*      */ 
+/* 1384 */             if ((I2cDeviceSynchImpl.this.readWindow.canBeUsedToRead()) && ((readSwitchUnnecessary) || (I2cDeviceSynchImpl.this.readWindow.mayInitiateSwitchToReadMode())))
+/*      */             {
+/* 1386 */               if (readSwitchUnnecessary)
+/*      */               {
+/*      */ 
+/*      */ 
+/* 1390 */                 I2cDeviceSynchImpl.this.readWindowActuallyRead = I2cDeviceSynchImpl.this.readWindowSentToController;
+/* 1391 */                 I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.QUEUED;
+/* 1392 */                 this.setActionFlag = true;
+/* 1393 */                 this.queueRead = true;
+/*      */ 
+/*      */               }
+/*      */               else
+/*      */               {
+/* 1398 */                 I2cDeviceSynchImpl.this.readWindowActuallyRead = I2cDeviceSynchImpl.this.readWindow;
+/* 1399 */                 startSwitchingToReadMode(I2cDeviceSynchImpl.this.readWindow);
+/*      */               }
+/*      */               
+/* 1402 */               issuedRead = true;
+/*      */             }
+/*      */           }
+/*      */           
+/* 1406 */           if (issuedRead)
+/*      */           {
+/*      */ 
+/*      */ 
+/* 1410 */             I2cDeviceSynchImpl.this.readWindow.noteWindowUsedForRead();
+/*      */ 
+/*      */           }
+/*      */           else
+/*      */           {
+/* 1415 */             I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.IDLE;
+/*      */           }
+/*      */           
+/* 1418 */           I2cDeviceSynchImpl.this.hasReadWindowChanged = false;
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */         }
+/* 1426 */         else if (I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.QUEUE_COMPLETED)
+/*      */         {
+/* 1428 */           if ((I2cDeviceSynchImpl.this.readWindow != null) && (I2cDeviceSynchImpl.this.readWindow.canBeUsedToRead()))
+/*      */           {
+/* 1430 */             I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.VALID_QUEUED;
+/* 1431 */             this.setActionFlag = true;
+/* 1432 */             this.queueRead = true;
+/*      */           }
+/*      */           else
+/*      */           {
+/* 1436 */             I2cDeviceSynchImpl.this.readCacheStatus = I2cDeviceSynchImpl.READ_CACHE_STATUS.VALID_ONLYONCE;
+/*      */ 
+/*      */           }
+/*      */           
+/*      */ 
+/*      */ 
+/*      */         }
+/* 1443 */         else if (I2cDeviceSynchImpl.this.readCacheStatus != I2cDeviceSynchImpl.READ_CACHE_STATUS.VALID_ONLYONCE) {}
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1453 */         if ((!this.setActionFlag) && (this.heartbeatRequired))
+/*      */         {
+/* 1455 */           if (I2cDeviceSynchImpl.this.heartbeatAction != null)
+/*      */           {
+/* 1457 */             if ((I2cDeviceSynchImpl.this.readWindowSentToController != null) && (I2cDeviceSynchImpl.this.heartbeatAction.rereadLastRead))
+/*      */             {
+/*      */ 
+/*      */ 
+/* 1461 */               if (isControllerPortInReadMode())
+/*      */               {
+/* 1463 */                 this.setActionFlag = true;
+/*      */               }
+/*      */               else
+/*      */               {
+/* 1467 */                 Assert.assertTrue(I2cDeviceSynchImpl.this.readCacheStatus == I2cDeviceSynchImpl.READ_CACHE_STATUS.SWITCHINGTOREADMODE);
+/*      */               }
+/*      */               
+/*      */             }
+/* 1471 */             else if ((I2cDeviceSynchImpl.this.isReadWindowSentToControllerInitialized) && (I2cDeviceSynchImpl.this.readWindowSentToController == null) && (I2cDeviceSynchImpl.this.heartbeatAction.rewriteLastWritten))
+/*      */             {
+/*      */ 
+/* 1474 */               this.queueFullWrite = true;
+/* 1475 */               this.setActionFlag = true;
+/*      */ 
+/*      */             }
+/* 1478 */             else if (I2cDeviceSynchImpl.this.heartbeatAction.heartbeatReadWindow != null)
+/*      */             {
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1484 */               final I2cDeviceSynch.ReadWindow window = I2cDeviceSynchImpl.this.heartbeatAction.heartbeatReadWindow;
+/*      */               try {
+/* 1486 */                 if (I2cDeviceSynchImpl.this.heartbeatExecutor != null)
+/*      */                 {
+/* 1488 */                   I2cDeviceSynchImpl.this.heartbeatExecutor.submit(new Runnable()
+/*      */                   {
+/*      */                     public void run()
+/*      */                     {
+/*      */                       try {
+/* 1493 */                         I2cDeviceSynchImpl.this.read(window.getRegisterFirst(), window.getRegisterCount());
+/*      */                       }
+/*      */                       catch (Exception localException) {}
+/*      */                     }
+/*      */                   });
+/*      */                 }
+/*      */               }
+/*      */               catch (RejectedExecutionException localRejectedExecutionException) {}
+/*      */             }
+/*      */           }
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1511 */         if (this.setActionFlag)
+/*      */         {
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1516 */           I2cDeviceSynchImpl.this.timeSinceLastHeartbeat.reset();
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1522 */         if ((this.enabledReadMode) || (this.enabledWriteMode))
+/*      */         {
+/* 1524 */           Assert.assertTrue(this.queueFullWrite);
+/* 1525 */           Assert.assertFalse((this.enabledReadMode) && (this.enabledWriteMode));
+/*      */           
+/* 1527 */           if (this.enabledWriteMode)
+/*      */           {
+/* 1529 */             I2cDeviceSynchImpl.this.controllerPortMode = I2cDeviceSynchImpl.CONTROLLER_PORT_MODE.WRITE;
+/*      */           }
+/*      */           else
+/*      */           {
+/* 1533 */             I2cDeviceSynchImpl.this.controllerPortMode = I2cDeviceSynchImpl.CONTROLLER_PORT_MODE.SWITCHINGTOREADMODE;
+/*      */           }
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1540 */         if (this.setActionFlag) {
+/* 1541 */           I2cDeviceSynchImpl.this.i2cDevice.setI2cPortActionFlag();
+/*      */         } else {
+/* 1543 */           I2cDeviceSynchImpl.this.i2cDevice.clearI2cPortActionFlag();
+/*      */         }
+/* 1545 */         if ((this.setActionFlag) && (!this.queueFullWrite))
+/*      */         {
+/* 1547 */           I2cDeviceSynchImpl.this.i2cDevice.writeI2cPortFlagOnlyToController();
+/*      */         }
+/* 1549 */         else if (this.queueFullWrite)
+/*      */         {
+/* 1551 */           I2cDeviceSynchImpl.this.i2cDevice.writeI2cCacheToController();
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1557 */         if (this.queueRead)
+/*      */         {
+/* 1559 */           I2cDeviceSynchImpl.this.i2cDevice.readI2cCacheFromController();
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/*      */ 
+/* 1565 */         if (I2cDeviceSynchImpl.this.loggingEnabled)
+/*      */         {
+/* 1567 */           StringBuilder message = new StringBuilder();
+/* 1568 */           message.append(String.format("cyc %d", new Object[] { Integer.valueOf(I2cDeviceSynchImpl.this.i2cDevice.getCallbackCount()) }));
+/* 1569 */           if (this.setActionFlag) message.append("|flag");
+/* 1570 */           if ((this.setActionFlag) && (!this.queueFullWrite)) { message.append("|f");
+/* 1571 */           } else if (this.queueFullWrite) message.append("|w"); else
+/* 1572 */             message.append("|.");
+/* 1573 */           if (this.queueRead) message.append("|r");
+/* 1574 */           if (I2cDeviceSynchImpl.this.readCacheStatus != this.prevReadCacheStatus) message.append("| R." + this.prevReadCacheStatus.toString() + "->" + I2cDeviceSynchImpl.this.readCacheStatus.toString());
+/* 1575 */           if (I2cDeviceSynchImpl.this.writeCacheStatus != this.prevWriteCacheStatus) message.append("| W." + this.prevWriteCacheStatus.toString() + "->" + I2cDeviceSynchImpl.this.writeCacheStatus.toString());
+/* 1576 */           if (this.enabledWriteMode) message.append(String.format("| setWrite(0x%02x,%d)", new Object[] { Integer.valueOf(I2cDeviceSynchImpl.this.iregWriteFirst), Integer.valueOf(I2cDeviceSynchImpl.this.cregWrite) }));
+/* 1577 */           if (this.enabledReadMode) { message.append(String.format("| setRead(0x%02x,%d)", new Object[] { Integer.valueOf(I2cDeviceSynchImpl.this.readWindow.getRegisterFirst()), Integer.valueOf(I2cDeviceSynchImpl.this.readWindow.getRegisterCount()) }));
+/*      */           }
+/* 1579 */           I2cDeviceSynchImpl.this.log(3, message.toString());
+/*      */         }
+/*      */         
+/*      */ 
+/*      */ 
+/* 1584 */         I2cDeviceSynchImpl.this.callbackLock.notifyAll();
+/*      */       }
+/*      */     }
+/*      */   }
+/*      */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\I2cDeviceSynchImpl.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.hardware;
-
-import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import com.qualcomm.robotcore.hardware.usb.RobotArmingStateNotifier;
-import com.qualcomm.robotcore.hardware.usb.RobotUsbModule;
-import com.qualcomm.robotcore.util.ElapsedTime;
-import com.qualcomm.robotcore.util.RobotLog;
-
-/**
- * {@link I2cDeviceSynchImpl} is a utility class that makes it easy to read or write data to
- * an instance of {@link I2cDevice}. Its functionality is exposed through the {@link I2cDeviceSynch} interface. Please see that
- * interface, and the {@link I2cDeviceSynchImpl} constructor here, for
- * further information.
- *
- * @see I2cDeviceSynchImpl#I2cDeviceSynchImpl(I2cDevice, I2cAddr, boolean)
- * @see I2cDeviceSynch
- * @see I2cDevice
- */
-public final class I2cDeviceSynchImpl implements I2cDeviceSynch, Engagable {
-	// ----------------------------------------------------------------------------------------------
-	// State
-	// ----------------------------------------------------------------------------------------------
-	protected I2cAddr i2cAddr; // the address we communicate with on the I2C bus
-	protected I2cDevice i2cDevice; // the device we are talking to
-	protected boolean isI2cDeviceOwned; // do we own the i2cDevice, or are we simply its client
-	protected I2cController controller; // that device's controller
-	protected RobotUsbModule robotUsbModule; // if the controller is a RobotUsbModule, then then him cast to this type
-
-	protected boolean isHooked; // whether we are connected to the underling device or not
-	protected boolean isEngaged; // user's hooking *intent*
-	protected AtomicInteger readerWriterPreventionCount;// used to be able to prevent new readers and writers
-	protected ReadWriteLock readerWriterGate; // used to to drain extant readers and writers. We ought not to need this
-// (concurrentClientLock ought to suffice), but it certainly works.
-	protected AtomicInteger readerWriterCount; // for debugging
-	protected boolean isClosing; // are we in the process of closing this device synch
-
-	protected Callback callback; // the callback object on which we actually receive callbacks
-	protected boolean loggingEnabled; // whether we are to log to Logcat or not
-	protected String loggingTag; // what we annotate our logging with
-	protected ElapsedTime timeSinceLastHeartbeat; // keeps track of our need for doing heartbeats
-
-	protected byte[] readCache; // the buffer into which reads are retrieved
-	protected byte[] writeCache; // the buffer that we write from
-	protected static final int dibCacheOverhead = 4; // this many bytes at start of writeCache are system overhead
-	protected Lock readCacheLock; // lock we must hold to look at readCache
-	protected Lock writeCacheLock; // lock we must old to look at writeCache
-	protected static final int msCallbackLockWaitQuantum = 60; // arbitrary, but long enough that we don't hit it in common
-// usage, only in shutdown situations
-	protected static final int msCallbackLockAbandon = 500; // if we don't see a callback in this amount of time, then something
-// seriously has gone wrong
-	protected boolean isWriteCoalescingEnabled; // are we allowed to coalesce adjacent writes, or must we issue them in order
-// separately?
-
-	protected final Object engagementLock = new Object();
-	protected final Object concurrentClientLock = new Object(); // the lock we use to serialize against concurrent clients of
-// us. Can't acquire this AFTER the callback lock.
-	protected final Object callbackLock = new Object(); // the lock we use to synchronize with our callback.
-
-	protected volatile ReadWindow readWindow; // the set of registers to look at when we are in read mode. May be null,
-// indicating no read needed
-	protected volatile ReadWindow readWindowActuallyRead; // the read window that was really read. readWindow will be a
-// (possibly non-proper) subset of this
-	protected volatile ReadWindow readWindowSentToController; // the read window we last issued to the controller module. May
-// disappear before read() returns
-	protected volatile boolean isReadWindowSentToControllerInitialized; // whether readWindowSentToController has valid data or
-// not
-	protected volatile boolean hasReadWindowChanged; // whether regWindow has changed since the hw cycle loop last took note
-	protected volatile long nanoTimeReadCacheValid; // the time on the System.nanoTime() clock at which the read cache was last
-// set as valid
-	protected volatile READ_CACHE_STATUS readCacheStatus; // what we know about the contents of readCache
-	protected volatile WRITE_CACHE_STATUS writeCacheStatus; // what we know about the (payload) contents of writeCache
-	protected volatile CONTROLLER_PORT_MODE controllerPortMode; // what we know about the controller's read vs write status on
-// the port we use
-	protected volatile int iregWriteFirst; // when writeCacheStatus is DIRTY, this is where we want to write
-	protected volatile int cregWrite;
-	protected volatile int msHeartbeatInterval; // time between heartbeats; zero is 'none necessary'
-	protected volatile HeartbeatAction heartbeatAction; // the action to take when a heartbeat is needed. May be null.
-	protected volatile ExecutorService heartbeatExecutor; // used to schedule heartbeats when we need to read from the outside
-
-	/* Keeps track of what we know about about the state of 'readCache' */
-	protected enum READ_CACHE_STATUS {
-		IDLE, // the read cache is quiescent; it doesn't contain valid data
-		SWITCHINGTOREADMODE, // a request to switch to read mode has been made
-		QUEUED, // an I2C read has been queued, but we've not yet seen valid data
-		QUEUE_COMPLETED, // a transient state only ever seen within the callback
-		VALID_ONLYONCE, // read cache data has valid data but can only be read once
-		VALID_QUEUED; // read cache has valid data AND a read has been queued
-
-		boolean isValid() {
-			return this == VALID_QUEUED || this == VALID_ONLYONCE;
-		}
-
-		boolean isQueued() {
-			return this == QUEUED || this == VALID_QUEUED;
-		}
-	}
-
-	/* Keeps track about what we know about the state of 'writeCache' */
-	protected enum WRITE_CACHE_STATUS {
-		IDLE, // write cache is quiescent
-		DIRTY, // write cache has changed bits that need to be pushed to module
-		QUEUED, // write cache is currently being written to module, not yet returned
-	}
-
-	/* Keeps track of what we know about the state of the controller's read vs write modality on our port */
-	protected enum CONTROLLER_PORT_MODE {
-		UNKNOWN, // we don't know anything about the controller
-		WRITE, // the controller is in write mode
-		SWITCHINGTOREADMODE, // the controller is transitioning to read mode: at the next
-		// portIsReady() callback, it will be there
-		READ // the port is in read mode, and can accept reads on the port data
-	};
-
-	// ----------------------------------------------------------------------------------------------
-	// Construction
-	// ----------------------------------------------------------------------------------------------
-
-	/**
-	 * Instantiate an {@link I2cDeviceSynchImpl} instance on the indicated {@link I2cDevice} using the indicated I2C address.
-	 *
-	 * @param i2cDevice the {@link I2cDevice} that the new {@link I2cDeviceSynchImpl} is
-	 *            to be a client of
-	 * @param i2cAddr the I2C address to which communications will be targeted
-	 * @param isI2cDeviceOwned If true, then when this {@link I2cDeviceSynchImpl} closes, the
-	 *            underlying {@link I2cDevice} is closed as well; otherwise, it is
-	 *            not. Typically, if the provided {@link I2cDevice} is retrieved from
-	 *            an OpMode's hardware map, one passes false to {@link #isI2cDeviceOwned},
-	 *            as such @link I2cDevice}s should remain functional across multiple
-	 *            OpMode invocations.
-	 * @see I2cDeviceSynch#close()
-	 * @see I2cDevice#close()
-	 */
-	public I2cDeviceSynchImpl(final I2cDevice i2cDevice, final I2cAddr i2cAddr, final boolean isI2cDeviceOwned) {
-		this.i2cAddr = i2cAddr;
-
-		this.i2cDevice = i2cDevice;
-		this.isI2cDeviceOwned = isI2cDeviceOwned;
-		controller = i2cDevice.getI2cController();
-		isEngaged = false;
-		isClosing = false;
-		isHooked = false;
-		readerWriterPreventionCount = new AtomicInteger(0);
-		readerWriterGate = new ReentrantReadWriteLock();
-		readerWriterCount = new AtomicInteger(0);
-		callback = new Callback();
-		loggingEnabled = false;
-		loggingTag = String.format("%s:i2cSynch(%s)", RobotLog.TAG, i2cDevice.getConnectionInfo());
-		;
-		timeSinceLastHeartbeat = new ElapsedTime();
-		timeSinceLastHeartbeat.reset();
-		msHeartbeatInterval = 0;
-		heartbeatAction = null;
-		heartbeatExecutor = null;
-		isWriteCoalescingEnabled = false;
-
-		readWindow = null;
-
-		if (controller instanceof RobotUsbModule) {
-			robotUsbModule = (RobotUsbModule) controller;
-			robotUsbModule.registerCallback(callback);
-		} else
-			throw new IllegalArgumentException("I2cController must also be a RobotUsbModule");
-
-		this.i2cDevice.registerForPortReadyBeginEndCallback(callback);
-	}
-
-	/**
-	 * Instantiates an {@link I2cDeviceSynchImpl} instance on the indicated {@link I2cDevice}.
-	 * When this constructor is used, {@link #setI2cAddr(I2cAddr)} must be called later in order
-	 * for the instance to be functional.
-	 *
-	 * @see #I2cDeviceSynchImpl(I2cDevice, I2cAddr, boolean)
-	 */
-	public I2cDeviceSynchImpl(final I2cDevice i2cDevice, final boolean isI2cDeviceOwned) {
-		this(i2cDevice, I2cAddr.zero(), isI2cDeviceOwned);
-	}
-
-	void attachToController()
-	// All the state that we maintain that is tied to the state of our controller
-	{
-		readCache = i2cDevice.getI2cReadCache();
-		readCacheLock = i2cDevice.getI2cReadCacheLock();
-		writeCache = i2cDevice.getI2cWriteCache();
-		writeCacheLock = i2cDevice.getI2cWriteCacheLock();
-
-		nanoTimeReadCacheValid = 0;
-		readCacheStatus = READ_CACHE_STATUS.IDLE;
-		writeCacheStatus = WRITE_CACHE_STATUS.IDLE;
-		controllerPortMode = CONTROLLER_PORT_MODE.UNKNOWN;
-
-		readWindowActuallyRead = null;
-		readWindowSentToController = null;
-		isReadWindowSentToControllerInitialized = false;
-
-		// So the callback will do it's thing to refresh based on the now-current window
-		hasReadWindowChanged = true;
-	}
-
-	@Override
-	public void setI2cAddress(final I2cAddr newAddress) {
-		setI2cAddr(newAddress);
-	}
-
-	@Override
-	public void setI2cAddr(final I2cAddr i2cAddr) {
-		synchronized (engagementLock) {
-			if (this.i2cAddr.get7Bit() != i2cAddr.get7Bit()) {
-				final boolean wasArmed = isHooked;
-				disengage();
-				//
-				this.i2cAddr = i2cAddr;
-				//
-				if (wasArmed) engage();
-			}
-		}
-	}
-
-	@Override
-	public I2cAddr getI2cAddress() {
-		return getI2cAddr();
-	}
-
-	@Override
-	public I2cAddr getI2cAddr() {
-		synchronized (engagementLock) {
-			return i2cAddr;
-		}
-	}
-
-	@Override
-	public void engage() {
-		// The engagement lock is distinct from the concurrentClientLock because we need to be
-		// able to drain heartbeats while disarming, so can't own the concurrentClientLock then,
-		// but we still need to be able to lock out engage() and disengage() against each other.
-		// Locking order: armingLock > concurrentClientLock > callbackLock
-		//
-		synchronized (engagementLock) {
-			isEngaged = true;
-			adjustHooking();
-		}
-	}
-
-	protected void hook() {
-		// engagementLock is distinct from the concurrentClientLock because we need to be
-		// able to drain heartbeats while disarming, so can't own the concurrentClientLock then,
-		// but we still need to be able to lock out engage() and disengage() against each other.
-		// Locking order: engagementLock > concurrentClientLock > callbackLock
-		//
-		synchronized (engagementLock) {
-			if (!isHooked) {
-				log(Log.VERBOSE, "hooking ...");
-				//
-				synchronized (callbackLock) {
-					heartbeatExecutor = ThreadPool.newSingleThreadExecutor();
-					i2cDevice.registerForI2cPortReadyCallback(callback);
-				}
-				isHooked = true;
-				//
-				log(Log.VERBOSE, "... hooking complete");
-			}
-		}
-	}
-
-	/* adjust the hooking state to reflect the user's engagement intent */
-	protected void adjustHooking() {
-		synchronized (engagementLock) {
-			if (!isHooked && isEngaged)
-				hook();
-			else if (isHooked && !isEngaged) unhook();
-		}
-	}
-
-	@Override
-	public boolean isEngaged() {
-		return isEngaged;
-	}
-
-	@Override
-	public boolean isArmed() {
-		synchronized (engagementLock) {
-			if (isHooked) {
-				return i2cDevice.isArmed();
-			}
-			return false;
-		}
-	}
-
-	@Override
-	public void disengage() {
-		synchronized (engagementLock) {
-			isEngaged = false;
-			adjustHooking();
-		}
-	}
-
-	protected void unhook() {
-		try {
-			synchronized (engagementLock) {
-				if (isHooked) {
-					log(Log.VERBOSE, "unhooking ...");
-
-					// We can't hold the concurrent client lock while we drain the heartbeat
-					// as that might be doing an external top-level read. But the semantic of
-					// Executors guarantees us this call returns any actions we've scheduled
-					// have in fact been completed.
-					heartbeatExecutor.shutdown();
-					ThreadPool.awaitTerminationOrExitApplication(heartbeatExecutor, 10, TimeUnit.SECONDS, "I2c Heartbeat", "internal error");
-
-					// Drain extant readers and writers
-					disableReadsAndWrites();
-					gracefullyDrainReadersAndWriters();
-
-					synchronized (callbackLock) {
-						// There may be still data that needs to get out to the controller.
-						// Wait until that happens.
-						waitForWriteCompletionInternal();
-
-						// Now we know that the callback isn't executing, we can pull the
-						// rug out from under his use of the heartbeater
-						heartbeatExecutor = null;
-
-						// Finally, disconnect us from our I2cDevice
-						i2cDevice.deregisterForPortReadyCallback();
-					}
-
-					isHooked = false;
-					enableReadsAndWrites();
-
-					log(Log.VERBOSE, "...unhooking complete");
-				}
-			}
-		} catch (final InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-	}
-
-	protected void disableReadsAndWrites() {
-		readerWriterPreventionCount.incrementAndGet();
-	}
-
-	protected void enableReadsAndWrites() {
-		readerWriterPreventionCount.decrementAndGet();
-	}
-
-	protected boolean newReadsAndWritesAllowed() {
-		return readerWriterPreventionCount.get() == 0;
-	}
-
-	protected void gracefullyDrainReadersAndWriters() {
-		boolean interrupted = false;
-		disableReadsAndWrites();
-
-		for (;;) {
-			try {
-				// Note: we can't hold the concurrentClientLock or the callbackLock as
-				// we attempt to take the readerWriterGate here, lest deadlock.
-				if (readerWriterGate.writeLock().tryLock(20, TimeUnit.MILLISECONDS)) {
-					// gate acquired exclusively, so no extant readers or writers exist
-					readerWriterGate.writeLock().unlock();
-					break;
-				} else {
-					// We timed out before hitting the lock. Run around the block again.
-				}
-			} catch (final InterruptedException e) {
-				interrupted = true;
-			}
-		}
-
-		if (interrupted) Thread.currentThread().interrupt();
-
-		assertTrue(readerWriterCount.get() == 0);
-		enableReadsAndWrites();
-	}
-
-	protected void forceDrainReadersAndWriters() {
-		boolean interrupted = false;
-		boolean exitLoop = false;
-		disableReadsAndWrites();
-
-		for (;;) {
-			synchronized (callbackLock) {
-				// Set the write cache status to idle to kick anyone out of waiting for it to idle
-				writeCacheStatus = WRITE_CACHE_STATUS.IDLE;
-
-				// Lie and say that the data in the read cache is valid
-				readCacheStatus = READ_CACHE_STATUS.VALID_QUEUED;
-				hasReadWindowChanged = false;
-				assertTrue(readCacheIsValid());
-
-				// Actually wake folk up
-				callbackLock.notifyAll();
-			}
-
-			if (exitLoop) break;
-
-			try {
-				// Note: we can't hold the concurrentClientLock or the callbackLock as
-				// we attempt to take the readerWriterGate here, lest deadlock.
-				if (readerWriterGate.writeLock().tryLock(20, TimeUnit.MILLISECONDS)) {
-					// gate acquired exclusively, so no extant readers or writers exist
-					readerWriterGate.writeLock().unlock();
-					exitLoop = true;
-				} else {
-					// We timed out before hitting the lock. Repoke the cache statuses
-					// and try again.
-				}
-			} catch (final InterruptedException e) {
-				interrupted = true;
-			}
-		}
-
-		if (interrupted) Thread.currentThread().interrupt();
-
-		// This assert has been observed to (inexplicably) fail. The circumstance at the time
-		// involved the unplugging of a CDIM from the phone.
-		assertTrue(readerWriterCount.get() == 0);
-		enableReadsAndWrites();
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// HardwareDevice
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public Manufacturer getManufacturer() {
-		return controller.getManufacturer();
-	}
-
-	@Override
-	public String getDeviceName() {
-		return i2cDevice.getDeviceName();
-	}
-
-	@Override
-	public String getConnectionInfo() {
-		return i2cDevice.getConnectionInfo();
-	}
-
-	@Override
-	public int getVersion() {
-		return i2cDevice.getVersion();
-	}
-
-	@Override
-	public void resetDeviceConfigurationForOpMode() {}
-
-	@Override
-	public void close() {
-		// Since we're closing, we don't need to know if we're not going to get any more
-		// notifications about ReadWriteRunnable coming and going: we're out of here!
-		isClosing = true;
-		i2cDevice.deregisterForPortReadyBeginEndCallback();
-
-		disengage();
-
-		if (isI2cDeviceOwned) i2cDevice.close();
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// Operations
-	// ----------------------------------------------------------------------------------------------
-
-	/*
-	 * Sets the set of I2C device registers that we wish to read.
-	 */
-	@Override
-	public void setReadWindow(final ReadWindow newWindow) {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				if (readWindow != null && readWindow.canBeUsedToRead() && readWindow.mayInitiateSwitchToReadMode() && readWindow.sameAsIncludingMode(newWindow)) {
-					// What's there is good; we don't need to change anything
-				} else {
-					// Remember the new window, but get a fresh copy so we can implement the read mode policy
-					setReadWindowInternal(newWindow.readableCopy());
-					assertTrue(readWindow.canBeUsedToRead() && readWindow.mayInitiateSwitchToReadMode());
-				}
-			}
-		}
-	}
-
-	/* locks must be externally taken */
-	protected void setReadWindowInternal(final ReadWindow newWindow) {
-		readWindow = newWindow;
-
-		// Let others (specifically, the callback) know of the update
-		hasReadWindowChanged = true;
-	}
-
-	/*
-	 * Return the current register window.
-	 */
-	@Override
-	public ReadWindow getReadWindow() {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				return readWindow;
-			}
-		}
-	}
-
-	/*
-	 * Ensure that the current register window covers the indicated set of registers.
-	 */
-	@Override
-	public void ensureReadWindow(final ReadWindow windowNeeded, final ReadWindow windowToSet) {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				if (readWindow == null || !readWindow.containsWithSameMode(windowNeeded)) {
-					setReadWindow(windowToSet);
-				}
-			}
-		}
-	}
-
-	/*
-	 * Read the byte at the indicated register.
-	 */
-	@Override
-	public byte read8(final int ireg) {
-		return read(ireg, 1)[0];
-	}
-
-	/*
-	 * Read a contiguous set of registers
-	 */
-	@Override
-	public byte[] read(final int ireg, final int creg) {
-		return this.readTimeStamped(ireg, creg).data;
-	}
-
-	/*
-	 * Read a contiguous set of registers.
-	 *
-	 * This is the core read routine. Note that the current read window is never
-	 * adjusted or invalidated by the execution of this function; that helps support
-	 * concurrent clients.
-	 */
-	@Override
-	public TimestampedData readTimeStamped(final int ireg, final int creg) {
-		try {
-			// Take the readerWriterLock so that others will be able to track when reads and writes have drained
-			acquireReaderLockShared();
-			try {
-				if (!isOpenForReading()) return makeFakeData(ireg, creg);
-
-				synchronized (concurrentClientLock) {
-					synchronized (callbackLock) {
-						// Wait until the write cache isn't busy. This honors the visibility semantic
-						// we intend to portray, namely that issuing a read after a write has been
-						// issued will see the state AFTER the write has had a chance to take effect.
-						while (writeCacheStatus != WRITE_CACHE_STATUS.IDLE) {
-							callbackLock.wait(msCallbackLockWaitQuantum);
-						}
-
-						// Remember what the read window was on entry so we can restore it later if needed
-						final ReadWindow prevReadWindow = readWindow;
-
-						// Is what's in the read cache right now or shortly will be have what we want?
-						if (readCacheValidityCurrentOrImminent() && readWindowActuallyRead != null && readWindowActuallyRead.contains(ireg, creg)) {
-							// Ok, we don't have to issue a read, but we may have to wait for validity,
-							// which we we do in a moment down below
-							// log(Log.VERBOSE, String.format("read from cache: (0x%02x,%d)", ireg, creg));
-						} else {
-							// We have to issue a new read. We do so by setting the read window to something
-							// that is readable; this is noticed by the callback which then services the read.
-
-							// If there's no read window given or what's there either can't service any
-							// more reads or it doesn't contain the required registers, auto-make a new window.
-							final boolean readWindowRangeOk = readWindow != null && readWindow.contains(ireg, creg);
-
-							if (!readWindowRangeOk || !readWindow.canBeUsedToRead() || !readWindow.mayInitiateSwitchToReadMode()) {
-								// If we can re-use the window that was there before that will help increase
-								// the chance that we don't need to take the time to switch the controller to
-								// read mode (with a different window) and thus can respond faster.
-								if (readWindowRangeOk) {
-									// log(Log.VERBOSE, String.format("reuse window: (0x%02x,%d)", ireg, creg));
-									setReadWindow(readWindow); // will make a readable copy
-								} else {
-									// Make a one-shot that just covers the data we need right now
-									// log(Log.VERBOSE, String.format("make one shot: (0x%02x,%d)", ireg, creg));
-									setReadWindow(new ReadWindow(ireg, creg, ReadMode.ONLY_ONCE));
-								}
-							}
-						}
-
-						// Wait until the read cache is valid
-						waitForValidReadCache();
-
-						// Extract the data and return!
-						readCacheLock.lockInterruptibly();
-						try {
-							assertTrue(readWindowActuallyRead.contains(readWindow));
-
-							// The data of interest is somewhere in the read window, but not necessarily at the start.
-							final int ibFirst = ireg - readWindowActuallyRead.getRegisterFirst() + dibCacheOverhead;
-							final TimestampedData result = new TimestampedData();
-							result.data = Arrays.copyOfRange(readCache, ibFirst, ibFirst + creg);
-							result.nanoTime = nanoTimeReadCacheValid;
-							return result;
-						} finally {
-							readCacheLock.unlock();
-
-							// If that was a one-time read, invalidate the data so we won't read it again a second time.
-							// Note that this is the only place outside of the callback that we ever update
-							// readCacheStatus or writeCacheStatus
-							if (readCacheStatus == READ_CACHE_STATUS.VALID_ONLYONCE) readCacheStatus = READ_CACHE_STATUS.IDLE;
-
-							// Restore any read window that we may have disturbed
-							if (readWindow != prevReadWindow) {
-								setReadWindowInternal(prevReadWindow);
-							}
-						}
-					}
-				}
-			} finally {
-				releaseReaderLockShared();
-			}
-		} catch (final InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return makeFakeData(ireg, creg);
-		}
-	}
-
-	protected boolean isOpenForReading() {
-		return isHooked && newReadsAndWritesAllowed();
-	}
-
-	protected boolean isOpenForWriting() {
-		return isHooked && newReadsAndWritesAllowed();
-	}
-
-	protected void acquireReaderLockShared() throws InterruptedException {
-		readerWriterGate.readLock().lockInterruptibly();
-		readerWriterCount.incrementAndGet(); // for debugging
-	}
-
-	protected void releaseReaderLockShared() {
-		readerWriterCount.decrementAndGet(); // for debugging
-		readerWriterGate.readLock().unlock();
-	}
-
-	public static TimestampedData makeFakeData(final int ireg, final int creg) {
-		final TimestampedData result = new TimestampedData();
-		result.data = new byte[creg]; // all zeros
-		result.nanoTime = System.nanoTime();
-		return result;
-	}
-
-	@Override
-	public TimestampedData readTimeStamped(final int ireg, final int creg, final ReadWindow readWindowNeeded, final ReadWindow readWindowSet) {
-		ensureReadWindow(readWindowNeeded, readWindowSet);
-		return readTimeStamped(ireg, creg);
-	}
-
-	protected boolean readCacheValidityCurrentOrImminent() {
-		return readCacheStatus != READ_CACHE_STATUS.IDLE && !hasReadWindowChanged;
-	}
-
-	protected boolean readCacheIsValid() {
-		return readCacheStatus.isValid() && !hasReadWindowChanged;
-	}
-
-	/*
-	 * Write a byte to the indicated register
-	 */
-	@Override
-	public void write8(final int ireg, final int data) {
-		this.write(ireg, new byte[] {(byte) data});
-	}
-
-	@Override
-	public void write8(final int ireg, final int data, final boolean waitforCompletion) {
-		this.write(ireg, new byte[] {(byte) data}, waitforCompletion);
-	}
-
-	/*
-	 * Write data to a set of registers, beginning with the one indicated. The data will be
-	 * written to the I2C device in an expeditious manner. Once data is accepted by this API,
-	 * it is guaranteed that (barring catastrophic failure) the data will be transmitted to the
-	 * USB controller module before the I2cDeviceSyncImpl is closed.
-	 */
-	@Override
-	public void write(final int ireg, final byte[] data) {
-		write(ireg, data, true);
-	}
-
-	@Override
-	public void write(final int iregPar, final byte[] dataPar, final boolean waitForCompletion) {
-		int ireg = iregPar;
-		byte[] data = dataPar;
-		try {
-			// Take the readerWriterLock so that others will be able to track when reads and writes have drained
-			acquireReaderLockShared();
-			try {
-				if (!isOpenForWriting()) return; // Ignore the write
-
-				synchronized (concurrentClientLock) {
-					if (data.length > ReadWindow.WRITE_REGISTER_COUNT_MAX) throw new IllegalArgumentException(String.format("write request of %d bytes is too large; max is %d", data.length, ReadWindow.WRITE_REGISTER_COUNT_MAX));
-
-					synchronized (callbackLock) {
-						// If there's already a pending write, can we coalesce?
-						boolean doCoalesce = false;
-						if (isWriteCoalescingEnabled && writeCacheStatus == WRITE_CACHE_STATUS.DIRTY && cregWrite + data.length <= ReadWindow.WRITE_REGISTER_COUNT_MAX) {
-							if (ireg + data.length == iregWriteFirst) {
-								// New data is immediately before the old data.
-								// leave ireg is unchanged
-								data = concatenateByteArrays(data, readWriteCache());
-								doCoalesce = true;
-							} else if (iregWriteFirst + cregWrite == ireg) {
-								// New data is immediately after the new data.
-								ireg = iregWriteFirst;
-								data = concatenateByteArrays(readWriteCache(), data);
-								doCoalesce = true;
-							}
-						}
-
-						// if (doCoalesce) this.log(Log.VERBOSE, "coalesced write");
-
-						// Wait until we can write to the write cache. If we are coalescing, then
-						// we don't ever wait, as we're just modifying what's there
-						if (!doCoalesce) {
-							waitForIdleWriteCache();
-						}
-
-						// Indicate where we want to write
-						iregWriteFirst = ireg;
-						cregWrite = data.length;
-
-						// Indicate we are dirty so the callback will write us out
-						setWriteCacheStatusIfHooked(WRITE_CACHE_STATUS.DIRTY);
-
-						// Provide the data we want to write
-						writeCacheLock.lock();
-						try {
-							System.arraycopy(data, 0, writeCache, dibCacheOverhead, data.length);
-						} finally {
-							writeCacheLock.unlock();
-						}
-
-						if (waitForCompletion) {
-							// Wait until the write at least issues to the device controller. This
-							// option is commonly used when making writes to an I2c device that require
-							// some manufacturer-specified minimum delay after their issuance: it such
-							// situations, it's necessary to know when the write has actually made it
-							// to the I2c device.
-							waitForWriteCompletionInternal();
-						}
-					}
-				}
-			} finally {
-				releaseReaderLockShared();
-			}
-		} catch (final InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-	}
-
-	protected static byte[] concatenateByteArrays(final byte[] left, final byte[] right) {
-		final byte[] result = new byte[left.length + right.length];
-		System.arraycopy(left, 0, result, 0, left.length);
-		System.arraycopy(right, 0, result, left.length, right.length);
-		return result;
-	}
-
-	@Override
-	public void waitForWriteCompletions() {
-		try {
-			synchronized (concurrentClientLock) {
-				synchronized (callbackLock) {
-					waitForWriteCompletionInternal();
-				}
-			}
-		} catch (final InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-	}
-
-	/* Returns a copy of the user data currently sitting in the write cache */
-	protected byte[] readWriteCache() {
-		writeCacheLock.lock();
-		try {
-			return Arrays.copyOfRange(writeCache, dibCacheOverhead, dibCacheOverhead + cregWrite);
-		} finally {
-			writeCacheLock.unlock();
-		}
-	}
-
-	protected void waitForWriteCompletionInternal() throws InterruptedException {
-		waitForIdleWriteCache();
-	}
-
-	/*
-	 * Waits the write cache to become idle. But that doesn't come within a totally unreasonable
-	 * amount of time, we're going to assume that our ReadWriteRunnable thread is either stuck or
-	 * is dead, and we're going to get out of here. *
-	 */
-	protected void waitForIdleWriteCache() throws InterruptedException {
-		ElapsedTime timer = null;
-		while (writeCacheStatus != WRITE_CACHE_STATUS.IDLE) {
-			if (timer == null) timer = new ElapsedTime();
-			if (timer.milliseconds() > msCallbackLockAbandon) throw new InterruptedException();
-			callbackLock.wait(msCallbackLockWaitQuantum);
-		}
-	}
-
-	/** @see #waitForIdleWriteCache() */
-	protected void waitForValidReadCache() throws InterruptedException {
-		ElapsedTime timer = null;
-		while (!readCacheIsValid()) {
-			if (timer == null) timer = new ElapsedTime();
-			if (timer.milliseconds() > msCallbackLockAbandon) throw new InterruptedException();
-			callbackLock.wait(msCallbackLockWaitQuantum);
-		}
-	}
-
-	/* set the write cache status, but don't disturb (from idle) if we're not open for business */
-	void setWriteCacheStatusIfHooked(final WRITE_CACHE_STATUS status) {
-		if (isHooked && newReadsAndWritesAllowed()) writeCacheStatus = status;
-	}
-
-	@Override
-	public void enableWriteCoalescing(final boolean enable) {
-		synchronized (concurrentClientLock) {
-			isWriteCoalescingEnabled = enable;
-		}
-	}
-
-	@Override
-	public boolean isWriteCoalescingEnabled() {
-		synchronized (concurrentClientLock) {
-			return isWriteCoalescingEnabled;
-		}
-	}
-
-	@Override
-	public void setLogging(final boolean enabled) {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				loggingEnabled = enabled;
-			}
-		}
-	}
-
-	@Override
-	public void setLoggingTag(final String loggingTag) {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				this.loggingTag = loggingTag + "I2C";
-			}
-		}
-	}
-
-	@Override
-	public int getHeartbeatInterval() {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				return msHeartbeatInterval;
-			}
-		}
-	}
-
-	@Override
-	public void setHeartbeatInterval(final int msHeartbeatInterval) {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				this.msHeartbeatInterval = Math.max(0, msHeartbeatInterval);
-			}
-		}
-	}
-
-	@Override
-	public void setHeartbeatAction(final HeartbeatAction action) {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				heartbeatAction = action;
-			}
-		}
-	}
-
-	@Override
-	public HeartbeatAction getHeartbeatAction() {
-		synchronized (concurrentClientLock) {
-			synchronized (callbackLock) {
-				return heartbeatAction;
-			}
-		}
-	}
-
-	protected void log(final int verbosity, final String message) {
-		switch (verbosity) {
-			case Log.VERBOSE:
-				Log.v(loggingTag, message);
-				break;
-			case Log.DEBUG:
-				Log.d(loggingTag, message);
-				break;
-			case Log.INFO:
-				Log.i(loggingTag, message);
-				break;
-			case Log.WARN:
-				Log.w(loggingTag, message);
-				break;
-			case Log.ERROR:
-				Log.e(loggingTag, message);
-				break;
-			case Log.ASSERT:
-				Log.wtf(loggingTag, message);
-				break;
-		}
-	}
-
-	protected void log(final int verbosity, final String format, final Object... args) {
-		log(verbosity, String.format(format, args));
-	}
-
-	protected class Callback implements I2cController.I2cPortReadyCallback, I2cController.I2cPortReadyBeginEndNotifications, RobotArmingStateNotifier.Callback {
-		// ------------------------------------------------------------------------------------------
-		// State, kept in member variables so we can divvy the updateStateMachines() logic
-		// across multiple function
-		// ------------------------------------------------------------------------------------------
-
-		protected boolean setActionFlag = false;
-		protected boolean queueFullWrite = false;
-		protected boolean queueRead = false;
-		protected boolean heartbeatRequired = false;
-		protected boolean enabledReadMode = false;
-		protected boolean enabledWriteMode = false;
-
-		protected READ_CACHE_STATUS prevReadCacheStatus = READ_CACHE_STATUS.IDLE;
-		protected WRITE_CACHE_STATUS prevWriteCacheStatus = WRITE_CACHE_STATUS.IDLE;
-
-		protected boolean doModuleIsArmedWorkEnabledWrites = false;
-		protected boolean haveSeenModuleIsArmedWork = false;
-
-		// ------------------------------------------------------------------------------------------
-		// I2cController.I2cPortReadyCallback
-		// ------------------------------------------------------------------------------------------
-
-		@Override
-		public void portIsReady(final int port)
-		// This is the callback from the device module indicating completion of previously requested work.
-		// At the moment we are called, we are assured that the read buffer / write buffer for our port in the
-		// USB device is not currently busy.
-		{
-			updateStateMachines();
-		}
-
-		// ------------------------------------------------------------------------------------------
-		// RobotUsbModule.ArmingStateCallback
-		// ------------------------------------------------------------------------------------------
-
-		@Override
-		public void onModuleStateChange(final RobotArmingStateNotifier robotUsbModule, final RobotUsbModule.ARMINGSTATE armingstate) {
-			switch (armingstate) {
-				case ARMED:
-					log(Log.VERBOSE, "onArmed ...");
-					doModuleIsArmedWork(true);
-					log(Log.VERBOSE, "... onArmed");
-					break;
-				case PRETENDING:
-					log(Log.VERBOSE, "onPretending ...");
-					doModuleIsArmedWork(false);
-					log(Log.VERBOSE, "... onPretending");
-					break;
-				case DISARMED:
-					// Unnecessary: we WILL get the onPortIsReadyCallbacksEnd() notification;
-					break;
-				default:
-					break;
-			}
-		}
-
-		// ------------------------------------------------------------------------------------------
-		// I2cController.I2cPortReadyBeginEndNotifications
-		// ------------------------------------------------------------------------------------------
-
-		@Override
-		public void onPortIsReadyCallbacksBegin(final int port) {
-			// We get this callback when we register for portIsReadyCallbacks and our module
-			// is either armed or pretending. If it's armed already, we're not going to get
-			// a notification that it changes into the armed state. So hook up now! Otherwise,
-			// we'll wait until the
-			log(Log.VERBOSE, "doPortIsReadyCallbackBeginWork ...");
-			try {
-				switch (robotUsbModule.getArmingState()) {
-					case ARMED:
-						doModuleIsArmedWork(true);
-						break;
-					case PRETENDING:
-						doModuleIsArmedWork(false);
-						break;
-					default:
-						break;
-				}
-			} finally {
-				log(Log.VERBOSE, "... doPortIsReadyCallbackBeginWork complete");
-			}
-		}
-
-		protected void doModuleIsArmedWork(final boolean arming) {
-			try {
-				log(Log.VERBOSE, "doModuleIsArmedWork ...");
-				synchronized (engagementLock) {
-					disableReadsAndWrites();
-					forceDrainReadersAndWriters();
-					unhook();
-
-					// Further locking appears unnecessary to invoke attachToController
-					attachToController();
-
-					adjustHooking();
-
-					// We are a little paranoid here. In theory, we ought to be able to work perfectly
-					// fine against a module that is pretending. But it's more robust of us to just leave
-					// reads and writes disabled at our upper surface rather than relying on that emulation
-					// to work. Moreover, during development, we hit a number of deadlocks when we tried,
-					// THOUGH those deadlocks might actually have been due to use not using onModuleStateChange
-					// to do the work but rather ONLY onPortIsReadyCallbacksBegin. That bug MIGHT have been
-					// the whole story, but it might not, and we're just too worn out to find out. So we take
-					// the robust, easy way out. For now, at least.
-					if (arming) {
-						enableReadsAndWrites();
-						doModuleIsArmedWorkEnabledWrites = true;
-					} else
-						doModuleIsArmedWorkEnabledWrites = false;
-
-					haveSeenModuleIsArmedWork = true;
-				}
-			} finally {
-				log(Log.VERBOSE, "... doModuleIsArmedWork complete");
-			}
-		}
-
-		@Override
-		public void onPortIsReadyCallbacksEnd(final int port)
-		// We're being told that we're not going to get any more portIsReady callbacks.
-		{
-			try {
-				log(Log.VERBOSE, "onPortIsReadyCallbacksEnd ...");
-
-				if (isClosing) return; // ignore
-
-				if (!haveSeenModuleIsArmedWork) return; // ReadWriteRunnable started then suddenly stopped before owner finished
-// arming
-
-				synchronized (engagementLock) {
-					if (doModuleIsArmedWorkEnabledWrites) {
-						disableReadsAndWrites();
-					}
-
-					forceDrainReadersAndWriters();
-					unhook();
-					assertTrue(!isOpenForReading() && !isOpenForWriting());
-					enableReadsAndWrites();
-
-					haveSeenModuleIsArmedWork = false;
-				}
-			} finally {
-				log(Log.VERBOSE, "... onPortIsReadyCallbacksEnd complete");
-			}
-		}
-
-		// ------------------------------------------------------------------------------------------
-		// Update logic
-		// ------------------------------------------------------------------------------------------
-
-		protected void startSwitchingToReadMode(final ReadWindow window) {
-			readCacheStatus = READ_CACHE_STATUS.SWITCHINGTOREADMODE;
-			// calling enableI2cReadMode() will set the mode, i2cAddr, and register range bytes in the write cache.
-			i2cDevice.enableI2cReadMode(i2cAddr, window.getRegisterFirst(), window.getRegisterCount());
-			enabledReadMode = true;
-
-			// Remember what we actually told the controller
-			readWindowSentToController = window;
-			isReadWindowSentToControllerInitialized = true;
-
-			setActionFlag = true; // causes an I2C read to happen
-			queueFullWrite = true; // write the bytes that enableI2cReadMode() set
-			// queueRead = true; // read the mode byte too so that i2cDevice.isI2cPortInReadMode() will report correctly - no
-// longer needed @@@
-		}
-
-		protected void issueWrite() {
-			setWriteCacheStatusIfHooked(WRITE_CACHE_STATUS.QUEUED);
-			// calling enableI2cWriteMode() will set the mode, i2cAddr, and register range bytes in the write cache.
-			i2cDevice.enableI2cWriteMode(i2cAddr, iregWriteFirst, cregWrite);
-			enabledWriteMode = true;
-
-			// This might be only paranoia, but we're not certain. In any case, it's safe.
-			readWindowSentToController = null;
-			isReadWindowSentToControllerInitialized = true;
-
-			setActionFlag = true; // causes the I2C write to happen
-			queueFullWrite = true; // write the bytes that enableI2cWriteMode() set
-			// queueRead = true; // read the mode byte too so that i2cDevice.isI2cPortInReadMode() will report correctly - no
-// longer needed @@@
-		}
-
-		protected boolean isControllerPortInReadMode() {
-			// return i2cDevice.isI2cPortInReadMode(); @@@
-			return controllerPortMode == CONTROLLER_PORT_MODE.READ;
-		}
-
-		protected void updateStateMachines()
-		// We've got quite the little state machine here!
-		{
-			synchronized (callbackLock) {
-				// ----------------------------------------------------------------------------------
-				// Initialize state for managing state transition
-
-				setActionFlag = false;
-				queueFullWrite = false;
-				queueRead = false;
-				heartbeatRequired = msHeartbeatInterval > 0 && timeSinceLastHeartbeat.milliseconds() >= msHeartbeatInterval;
-				enabledReadMode = false;
-				enabledWriteMode = false;
-
-				prevReadCacheStatus = readCacheStatus;
-				prevWriteCacheStatus = writeCacheStatus;
-
-				// ----------------------------------------------------------------------------------
-				// Keep track of controller port mode states. The rule, we understand, is that after we request
-				// a switch to read mode, once we get the 'port is ready' callback, then read mode is in fact
-				// enabled. We had previously thought that we actually had to *read* the 'what mode am I in'
-				// bytes and look for 'read mode' (see i2cDevice.isI2cPortInReadMode()), but that's apparently
-				// not the case. The changes that enabled our now-optimized-code are all retained in comments
-				// tagged with '@@@'; there are three of them: uncomment those, and you'll go back to the way
-				// we were before.
-				if (controllerPortMode == CONTROLLER_PORT_MODE.SWITCHINGTOREADMODE) controllerPortMode = CONTROLLER_PORT_MODE.READ;
-
-				// ----------------------------------------------------------------------------------
-				// Deal with the fact that we've completed any previous queueing operation
-
-				if (readCacheStatus == READ_CACHE_STATUS.QUEUED || readCacheStatus == READ_CACHE_STATUS.VALID_QUEUED) {
-					readCacheStatus = READ_CACHE_STATUS.QUEUE_COMPLETED;
-					nanoTimeReadCacheValid = System.nanoTime();
-				}
-
-				if (writeCacheStatus == WRITE_CACHE_STATUS.QUEUED) {
-					writeCacheStatus = WRITE_CACHE_STATUS.IDLE;
-					// Our write mode status should have been reported back to us. And it
-					// always will, so long as our module remains operational.
-					//
-					// But that might not happen *right* at the moment our module disconnects:
-					// we've lost communication; we're not going to see the write mode status
-					// reported back, but the hole module-disconnect-handing sequence has yet to
-					// tear everything down in response.
-					//
-					// There doesn't seem to be any way to reliably do an assert, as that loss
-					// of connection might have not yet got through to *anybody*.
-					//
-					// assertTrue(!isHooked || !newReadsAndWritesAllowed() || i2cDevice.isI2cPortInWriteMode());
-				}
-
-				// --------------------------------------------------------------------------
-				// That limits the number of states the caches can now be in
-
-				assertTrue(readCacheStatus == READ_CACHE_STATUS.IDLE || readCacheStatus == READ_CACHE_STATUS.SWITCHINGTOREADMODE || readCacheStatus == READ_CACHE_STATUS.VALID_ONLYONCE || readCacheStatus == READ_CACHE_STATUS.QUEUE_COMPLETED);
-				assertTrue(writeCacheStatus == WRITE_CACHE_STATUS.IDLE || writeCacheStatus == WRITE_CACHE_STATUS.DIRTY);
-
-				// --------------------------------------------------------------------------
-				// Complete any read mode switch if there is one
-
-				if (readCacheStatus == READ_CACHE_STATUS.SWITCHINGTOREADMODE) {
-					// We're trying to switch into read mode. Are we there yet?
-					if (isControllerPortInReadMode()) {
-						// See also below XYZZY
-						readCacheStatus = READ_CACHE_STATUS.QUEUED;
-						setActionFlag = true; // actually do an I2C read
-						queueRead = true; // read the I2C read results
-					} else {
-						queueRead = true; // read the mode byte
-					}
-				}
-
-				// --------------------------------------------------------------------------
-				// If there's a write request pending, and it's ok to issue the write, do so
-
-				else if (writeCacheStatus == WRITE_CACHE_STATUS.DIRTY) {
-					issueWrite();
-
-					// Our ordering rules are that any reads after a write have to wait until
-					// the write is actually sent to the hardware, so anything we've read before is junk.
-					// Note that there's an analogous check in read().
-					readCacheStatus = READ_CACHE_STATUS.IDLE;
-				}
-
-				// --------------------------------------------------------------------------
-				// Initiate reading if we should. Be sure to honor the policy of the read mode.
-
-				else if (readCacheStatus == READ_CACHE_STATUS.IDLE || hasReadWindowChanged) {
-					boolean issuedRead = false;
-					if (readWindow != null) {
-						// Is the controller already set up to read the data we're now interested
-						// in, so that we can get at it without having to incur the cost of
-						// switching to read mode?
-						final boolean readSwitchUnnecessary = readWindowSentToController != null && readWindowSentToController.contains(readWindow) && isControllerPortInReadMode();
-
-						if (readWindow.canBeUsedToRead() && (readSwitchUnnecessary || readWindow.mayInitiateSwitchToReadMode())) {
-							if (readSwitchUnnecessary) {
-								// Lucky us! We can go ahead and queue the read right now!
-								// See also above XYZZY
-								readWindowActuallyRead = readWindowSentToController;
-								readCacheStatus = READ_CACHE_STATUS.QUEUED;
-								setActionFlag = true; // actually do an I2C read
-								queueRead = true; // read the results of the read
-							} else {
-								// We'll start switching now, and queue the read later
-								readWindowActuallyRead = readWindow;
-								startSwitchingToReadMode(readWindow);
-							}
-
-							issuedRead = true;
-						}
-					}
-
-					if (issuedRead) {
-						// Remember that we've used this window in a read operation. This doesn't
-						// matter for REPEATs, but does for the other modes
-						readWindow.noteWindowUsedForRead();
-					} else {
-						// Make *sure* that we don't appear to have valid data
-						readCacheStatus = READ_CACHE_STATUS.IDLE;
-					}
-
-					hasReadWindowChanged = false;
-				}
-
-				// --------------------------------------------------------------------------
-				// Reissue any previous read if we should. The only way we are here and
-				// see READ_CACHE_STATUS.QUEUE_COMPLETED is if we completed a queuing operation
-				// above.
-
-				else if (readCacheStatus == READ_CACHE_STATUS.QUEUE_COMPLETED) {
-					if (readWindow != null && readWindow.canBeUsedToRead()) {
-						readCacheStatus = READ_CACHE_STATUS.VALID_QUEUED;
-						setActionFlag = true; // actually do an I2C read
-						queueRead = true; // read the results of the read
-					} else {
-						readCacheStatus = READ_CACHE_STATUS.VALID_ONLYONCE;
-					}
-				}
-
-				// --------------------------------------------------------------------------
-				// Completing the possibilities:
-
-				else if (readCacheStatus == READ_CACHE_STATUS.VALID_ONLYONCE) {
-					// Just leave it there until someone reads it
-				}
-
-				// ----------------------------------------------------------------------------------
-				// Ok, after all that we finally know what how we're required to
-				// interact with the device controller according to what we've been
-				// asked to read or write. But what, now, about heartbeats?
-
-				if (!setActionFlag && heartbeatRequired) {
-					if (heartbeatAction != null) {
-						if (readWindowSentToController != null && heartbeatAction.rereadLastRead) {
-							// Controller is in or is switching to read mode. If he's there
-							// yet, then issue an I2C read; if he's not, then he soon will be.
-							if (isControllerPortInReadMode()) {
-								setActionFlag = true; // issue an I2C read
-							} else {
-								assertTrue(readCacheStatus == READ_CACHE_STATUS.SWITCHINGTOREADMODE);
-							}
-						}
-
-						else if (isReadWindowSentToControllerInitialized && readWindowSentToController == null && heartbeatAction.rewriteLastWritten) {
-							// Controller is in write mode, and the write cache has what we last wrote
-							queueFullWrite = true;
-							setActionFlag = true; // issue an I2C write
-						}
-
-						else if (heartbeatAction.heartbeatReadWindow != null) {
-							// The simplest way to do this is just to do a new read from the outside, as that
-							// means it has literally zero impact here on our state machine. That unfortunately
-							// introduces concurrency where otherwise none might exist, but that's ONLY if you
-							// choose this flavor of heartbeat, so that's a reasonable tradeoff.
-							final ReadWindow window = heartbeatAction.heartbeatReadWindow; // capture here while we still have
-// the lock
-							try {
-								if (heartbeatExecutor != null) {
-									heartbeatExecutor.submit(() -> {
-										try {
-											read(window.getRegisterFirst(), window.getRegisterCount());
-										} catch (final Exception e) // paranoia
-										{
-											// ignored
-										}
-									});
-								}
-							} catch (final RejectedExecutionException e) {
-								// ignore: maybe we're racing with disarm
-							}
-						}
-					}
-				}
-
-				if (setActionFlag) {
-					// We're about to communicate on I2C right now, so reset the heartbeat.
-					// Note that we reset() *before* we talk to the device so as to do
-					// conservative timing accounting.
-					timeSinceLastHeartbeat.reset();
-				}
-
-				// ----------------------------------------------------------------------------------
-				// Keep track about what we know about our port on the controller
-
-				if (enabledReadMode || enabledWriteMode) {
-					assertTrue(queueFullWrite); // they're useless without actually writing them
-					assertFalse(enabledReadMode && enabledWriteMode); // that would be silly
-
-					if (enabledWriteMode) {
-						controllerPortMode = CONTROLLER_PORT_MODE.WRITE;
-					} else {
-						controllerPortMode = CONTROLLER_PORT_MODE.SWITCHINGTOREADMODE;
-					}
-				}
-
-				// ----------------------------------------------------------------------------------
-				// Read, set action flag and / or queue to module as requested
-
-				if (setActionFlag)
-					i2cDevice.setI2cPortActionFlag();
-				else
-					i2cDevice.clearI2cPortActionFlag();
-
-				if (setActionFlag && !queueFullWrite) {
-					i2cDevice.writeI2cPortFlagOnlyToController();
-				} else if (queueFullWrite) {
-					i2cDevice.writeI2cCacheToController();
-				}
-
-				// Queue a read after queuing any write for a bit of paranoia: if we're mode switching
-				// to write, we want that write to go out first, THEN read the mode status. It probably
-				// would anyway, but why not...
-				if (queueRead) {
-					i2cDevice.readI2cCacheFromController();
-				}
-
-				// ----------------------------------------------------------------------------------
-				// Do logging
-
-				if (loggingEnabled) {
-					final StringBuilder message = new StringBuilder();
-					message.append(String.format("cyc %d", i2cDevice.getCallbackCount()));
-					if (setActionFlag) message.append("|flag");
-					if (setActionFlag && !queueFullWrite)
-						message.append("|f");
-					else if (queueFullWrite)
-						message.append("|w");
-					else
-						message.append("|.");
-					if (queueRead) message.append("|r");
-					if (readCacheStatus != prevReadCacheStatus) message.append("| R." + prevReadCacheStatus.toString() + "->" + readCacheStatus.toString());
-					if (writeCacheStatus != prevWriteCacheStatus) message.append("| W." + prevWriteCacheStatus.toString() + "->" + writeCacheStatus.toString());
-					if (enabledWriteMode) message.append(String.format("| setWrite(0x%02x,%d)", iregWriteFirst, cregWrite));
-					if (enabledReadMode) message.append(String.format("| setRead(0x%02x,%d)", readWindow.getRegisterFirst(), readWindow.getRegisterCount()));
-
-					log(Log.DEBUG, message.toString());
-				}
-
-				// ----------------------------------------------------------------------------------
-				// Notify anyone blocked in read() or write()
-				callbackLock.notifyAll();
-			}
-		}
-	}
-}

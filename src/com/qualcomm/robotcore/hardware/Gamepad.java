@@ -1,604 +1,610 @@
-/*
- * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification, are permitted
- * (subject to the limitations in the disclaimer below) provided that the following conditions are
- * met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list of conditions
- * and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
- * and the following disclaimer in the documentation and/or other materials provided with the
- * distribution.
- * 
- * Neither the name of Qualcomm Technologies Inc nor the names of its contributors may be used to
- * endorse or promote products derived from this software without specific prior written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
- * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
- * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.hardware;
+/*     */ 
+/*     */ import android.annotation.TargetApi;
+/*     */ import android.os.Build.VERSION;
+/*     */ import android.view.InputDevice;
+/*     */ import android.view.KeyEvent;
+/*     */ import android.view.MotionEvent;
+/*     */ import com.qualcomm.robotcore.exception.RobotCoreException;
+/*     */ import com.qualcomm.robotcore.robocol.RobocolParsable.MsgType;
+/*     */ import com.qualcomm.robotcore.robocol.RobocolParsableBase;
+/*     */ import com.qualcomm.robotcore.util.Range;
+/*     */ import com.qualcomm.robotcore.util.RobotLog;
+/*     */ import java.nio.BufferOverflowException;
+/*     */ import java.nio.ByteBuffer;
+/*     */ import java.util.AbstractMap.SimpleEntry;
+/*     */ import java.util.HashSet;
+/*     */ import java.util.Set;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class Gamepad
+/*     */   extends RobocolParsableBase
+/*     */ {
+/*     */   public static final int ID_UNASSOCIATED = -1;
+/*  93 */   public float left_stick_x = 0.0F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*  98 */   public float left_stick_y = 0.0F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 103 */   public float right_stick_x = 0.0F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 108 */   public float right_stick_y = 0.0F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 113 */   public boolean dpad_up = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 118 */   public boolean dpad_down = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 123 */   public boolean dpad_left = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 128 */   public boolean dpad_right = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 133 */   public boolean a = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 138 */   public boolean b = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 143 */   public boolean x = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 148 */   public boolean y = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/* 155 */   public boolean guide = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 160 */   public boolean start = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 165 */   public boolean back = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 170 */   public boolean left_bumper = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 175 */   public boolean right_bumper = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 180 */   public boolean left_stick_button = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 185 */   public boolean right_stick_button = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 190 */   public float left_trigger = 0.0F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 195 */   public float right_trigger = 0.0F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 200 */   public byte user = -1;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 205 */   public int id = -1;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/* 210 */   public long timestamp = 0L;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/* 216 */   protected float dpadThreshold = 0.2F;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/* 222 */   protected float joystickDeadzone = 0.2F;
+/*     */   
+/*     */   private static final short PAYLOAD_SIZE = 42;
+/*     */   
+/*     */   private static final short BUFFER_SIZE = 47;
+/*     */   
+/*     */   private static final byte ROBOCOL_VERSION = 2;
+/*     */   
+/*     */   private static final float MAX_MOTION_RANGE = 1.0F;
+/*     */   
+/*     */   private final GamepadCallback callback;
+/*     */   
+/* 234 */   private static Set<Integer> gameControllerDeviceIdCache = new HashSet();
+/*     */   
+/*     */ 
+/* 237 */   private static Set<DeviceId> deviceWhitelist = null;
+/*     */   
+/*     */ 
+/*     */   private static class DeviceId
+/*     */     extends AbstractMap.SimpleEntry<Integer, Integer>
+/*     */   {
+/*     */     private static final long serialVersionUID = -6429575391769944899L;
+/*     */     
+/*     */ 
+/*     */     public DeviceId(int vendorId, int productId)
+/*     */     {
+/* 248 */       super(Integer.valueOf(productId));
+/*     */     }
+/*     */     
+/*     */     public int getVendorId()
+/*     */     {
+/* 253 */       return ((Integer)getKey()).intValue();
+/*     */     }
+/*     */     
+/*     */     public int getProductId()
+/*     */     {
+/* 258 */       return ((Integer)getValue()).intValue();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public Gamepad()
+/*     */   {
+/* 264 */     this(null);
+/*     */   }
+/*     */   
+/*     */   public Gamepad(GamepadCallback callback) {
+/* 268 */     this.callback = callback;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void copy(Gamepad gamepad)
+/*     */     throws RobotCoreException
+/*     */   {
+/* 279 */     fromByteArray(gamepad.toByteArray());
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void reset()
+/*     */   {
+/*     */     try
+/*     */     {
+/* 287 */       copy(new Gamepad());
+/*     */     }
+/*     */     catch (RobotCoreException e) {
+/* 290 */       RobotLog.e("Gamepad library in an invalid state");
+/* 291 */       throw new IllegalStateException("Gamepad library in an invalid state");
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void setJoystickDeadzone(float deadzone)
+/*     */   {
+/* 300 */     if ((deadzone < 0.0F) || (deadzone > 1.0F)) {
+/* 301 */       throw new IllegalArgumentException("deadzone cannot be greater than max joystick value");
+/*     */     }
+/*     */     
+/* 304 */     this.joystickDeadzone = deadzone;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void update(MotionEvent event)
+/*     */   {
+/* 313 */     this.id = event.getDeviceId();
+/* 314 */     this.timestamp = event.getEventTime();
+/*     */     
+/* 316 */     this.left_stick_x = cleanMotionValues(event.getAxisValue(0));
+/* 317 */     this.left_stick_y = cleanMotionValues(event.getAxisValue(1));
+/* 318 */     this.right_stick_x = cleanMotionValues(event.getAxisValue(11));
+/* 319 */     this.right_stick_y = cleanMotionValues(event.getAxisValue(14));
+/* 320 */     this.left_trigger = event.getAxisValue(17);
+/* 321 */     this.right_trigger = event.getAxisValue(18);
+/* 322 */     this.dpad_down = (event.getAxisValue(16) > this.dpadThreshold);
+/* 323 */     this.dpad_up = (event.getAxisValue(16) < -this.dpadThreshold);
+/* 324 */     this.dpad_right = (event.getAxisValue(15) > this.dpadThreshold);
+/* 325 */     this.dpad_left = (event.getAxisValue(15) < -this.dpadThreshold);
+/*     */     
+/* 327 */     callCallback();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void update(KeyEvent event)
+/*     */   {
+/* 336 */     this.id = event.getDeviceId();
+/* 337 */     this.timestamp = event.getEventTime();
+/*     */     
+/* 339 */     int key = event.getKeyCode();
+/* 340 */     if (key == 19) { this.dpad_up = pressed(event);
+/* 341 */     } else if (key == 20) { this.dpad_down = pressed(event);
+/* 342 */     } else if (key == 22) { this.dpad_right = pressed(event);
+/* 343 */     } else if (key == 21) { this.dpad_left = pressed(event);
+/* 344 */     } else if (key == 96) { this.a = pressed(event);
+/* 345 */     } else if (key == 97) { this.b = pressed(event);
+/* 346 */     } else if (key == 99) { this.x = pressed(event);
+/* 347 */     } else if (key == 100) { this.y = pressed(event);
+/* 348 */     } else if (key == 110) { this.guide = pressed(event);
+/* 349 */     } else if (key == 108) { this.start = pressed(event);
+/* 350 */     } else if (key == 109) { this.back = pressed(event);
+/* 351 */     } else if (key == 103) { this.right_bumper = pressed(event);
+/* 352 */     } else if (key == 102) { this.left_bumper = pressed(event);
+/* 353 */     } else if (key == 106) { this.left_stick_button = pressed(event);
+/* 354 */     } else if (key == 107) { this.right_stick_button = pressed(event);
+/*     */     }
+/* 356 */     callCallback();
+/*     */   }
+/*     */   
+/*     */   public RobocolParsable.MsgType getRobocolMsgType()
+/*     */   {
+/* 361 */     return RobocolParsable.MsgType.GAMEPAD;
+/*     */   }
+/*     */   
+/*     */   public byte[] toByteArray()
+/*     */     throws RobotCoreException
+/*     */   {
+/* 367 */     ByteBuffer buffer = getWriteBuffer(42);
+/*     */     try
+/*     */     {
+/* 370 */       int buttons = 0;
+/*     */       
+/* 372 */       buffer.put((byte)2);
+/* 373 */       buffer.putInt(this.id);
+/* 374 */       buffer.putLong(this.timestamp).array();
+/* 375 */       buffer.putFloat(this.left_stick_x).array();
+/* 376 */       buffer.putFloat(this.left_stick_y).array();
+/* 377 */       buffer.putFloat(this.right_stick_x).array();
+/* 378 */       buffer.putFloat(this.right_stick_y).array();
+/* 379 */       buffer.putFloat(this.left_trigger).array();
+/* 380 */       buffer.putFloat(this.right_trigger).array();
+/*     */       
+/* 382 */       buttons = (buttons << 1) + (this.left_stick_button ? 1 : 0);
+/* 383 */       buttons = (buttons << 1) + (this.right_stick_button ? 1 : 0);
+/* 384 */       buttons = (buttons << 1) + (this.dpad_up ? 1 : 0);
+/* 385 */       buttons = (buttons << 1) + (this.dpad_down ? 1 : 0);
+/* 386 */       buttons = (buttons << 1) + (this.dpad_left ? 1 : 0);
+/* 387 */       buttons = (buttons << 1) + (this.dpad_right ? 1 : 0);
+/* 388 */       buttons = (buttons << 1) + (this.a ? 1 : 0);
+/* 389 */       buttons = (buttons << 1) + (this.b ? 1 : 0);
+/* 390 */       buttons = (buttons << 1) + (this.x ? 1 : 0);
+/* 391 */       buttons = (buttons << 1) + (this.y ? 1 : 0);
+/* 392 */       buttons = (buttons << 1) + (this.guide ? 1 : 0);
+/* 393 */       buttons = (buttons << 1) + (this.start ? 1 : 0);
+/* 394 */       buttons = (buttons << 1) + (this.back ? 1 : 0);
+/* 395 */       buttons = (buttons << 1) + (this.left_bumper ? 1 : 0);
+/* 396 */       buttons = (buttons << 1) + (this.right_bumper ? 1 : 0);
+/* 397 */       buffer.putInt(buttons);
+/*     */       
+/* 399 */       buffer.put(this.user);
+/*     */     } catch (BufferOverflowException e) {
+/* 401 */       RobotLog.logStacktrace(e);
+/*     */     }
+/*     */     
+/* 404 */     return buffer.array();
+/*     */   }
+/*     */   
+/*     */   public void fromByteArray(byte[] byteArray) throws RobotCoreException
+/*     */   {
+/* 409 */     if (byteArray.length < 47) {
+/* 410 */       throw new RobotCoreException("Expected buffer of at least 47 bytes, received " + byteArray.length);
+/*     */     }
+/*     */     
+/* 413 */     ByteBuffer byteBuffer = getReadBuffer(byteArray);
+/*     */     
+/* 415 */     int buttons = 0;
+/*     */     
+/* 417 */     byte version = byteBuffer.get();
+/*     */     
+/*     */ 
+/* 420 */     if (version >= 1) {
+/* 421 */       this.id = byteBuffer.getInt();
+/* 422 */       this.timestamp = byteBuffer.getLong();
+/* 423 */       this.left_stick_x = byteBuffer.getFloat();
+/* 424 */       this.left_stick_y = byteBuffer.getFloat();
+/* 425 */       this.right_stick_x = byteBuffer.getFloat();
+/* 426 */       this.right_stick_y = byteBuffer.getFloat();
+/* 427 */       this.left_trigger = byteBuffer.getFloat();
+/* 428 */       this.right_trigger = byteBuffer.getFloat();
+/*     */       
+/* 430 */       buttons = byteBuffer.getInt();
+/* 431 */       this.left_stick_button = ((buttons & 0x4000) != 0);
+/* 432 */       this.right_stick_button = ((buttons & 0x2000) != 0);
+/* 433 */       this.dpad_up = ((buttons & 0x1000) != 0);
+/* 434 */       this.dpad_down = ((buttons & 0x800) != 0);
+/* 435 */       this.dpad_left = ((buttons & 0x400) != 0);
+/* 436 */       this.dpad_right = ((buttons & 0x200) != 0);
+/* 437 */       this.a = ((buttons & 0x100) != 0);
+/* 438 */       this.b = ((buttons & 0x80) != 0);
+/* 439 */       this.x = ((buttons & 0x40) != 0);
+/* 440 */       this.y = ((buttons & 0x20) != 0);
+/* 441 */       this.guide = ((buttons & 0x10) != 0);
+/* 442 */       this.start = ((buttons & 0x8) != 0);
+/* 443 */       this.back = ((buttons & 0x4) != 0);
+/* 444 */       this.left_bumper = ((buttons & 0x2) != 0);
+/* 445 */       this.right_bumper = ((buttons & 0x1) != 0);
+/*     */     }
+/*     */     
+/*     */ 
+/* 449 */     if (version >= 2) {
+/* 450 */       this.user = byteBuffer.get();
+/*     */     }
+/*     */     
+/* 453 */     callCallback();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public boolean atRest()
+/*     */   {
+/* 461 */     return (this.left_stick_x == 0.0F) && (this.left_stick_y == 0.0F) && (this.right_stick_x == 0.0F) && (this.right_stick_y == 0.0F) && (this.left_trigger == 0.0F) && (this.right_trigger == 0.0F);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public String type()
+/*     */   {
+/* 472 */     return "Standard";
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public String toString()
+/*     */   {
+/* 481 */     String buttons = new String();
+/* 482 */     if (this.dpad_up) buttons = buttons + "dpad_up ";
+/* 483 */     if (this.dpad_down) buttons = buttons + "dpad_down ";
+/* 484 */     if (this.dpad_left) buttons = buttons + "dpad_left ";
+/* 485 */     if (this.dpad_right) buttons = buttons + "dpad_right ";
+/* 486 */     if (this.a) buttons = buttons + "a ";
+/* 487 */     if (this.b) buttons = buttons + "b ";
+/* 488 */     if (this.x) buttons = buttons + "x ";
+/* 489 */     if (this.y) buttons = buttons + "y ";
+/* 490 */     if (this.guide) buttons = buttons + "guide ";
+/* 491 */     if (this.start) buttons = buttons + "start ";
+/* 492 */     if (this.back) buttons = buttons + "back ";
+/* 493 */     if (this.left_bumper) buttons = buttons + "left_bumper ";
+/* 494 */     if (this.right_bumper) buttons = buttons + "right_bumper ";
+/* 495 */     if (this.left_stick_button) buttons = buttons + "left stick button ";
+/* 496 */     if (this.right_stick_button) { buttons = buttons + "right stick button ";
+/*     */     }
+/* 498 */     return String.format("ID: %2d user: %2d lx: % 1.2f ly: % 1.2f rx: % 1.2f ry: % 1.2f lt: %1.2f rt: %1.2f %s", new Object[] { Integer.valueOf(this.id), Byte.valueOf(this.user), Float.valueOf(this.left_stick_x), Float.valueOf(this.left_stick_y), Float.valueOf(this.right_stick_x), Float.valueOf(this.right_stick_y), Float.valueOf(this.left_trigger), Float.valueOf(this.right_trigger), buttons });
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   protected float cleanMotionValues(float number)
+/*     */   {
+/* 509 */     if ((number < this.joystickDeadzone) && (number > -this.joystickDeadzone)) { return 0.0F;
+/*     */     }
+/*     */     
+/* 512 */     if (number > 1.0F) return 1.0F;
+/* 513 */     if (number < -1.0F) { return -1.0F;
+/*     */     }
+/*     */     
+/* 516 */     if (number > 0.0F) {
+/* 517 */       number = (float)Range.scale(number, this.joystickDeadzone, 1.0D, 0.0D, 1.0D);
+/*     */     } else {
+/* 519 */       number = (float)Range.scale(number, -this.joystickDeadzone, -1.0D, 0.0D, -1.0D);
+/*     */     }
+/* 521 */     return number;
+/*     */   }
+/*     */   
+/*     */   protected boolean pressed(KeyEvent event) {
+/* 525 */     return event.getAction() == 0;
+/*     */   }
+/*     */   
+/*     */   protected void callCallback() {
+/* 529 */     if (this.callback != null) { this.callback.gamepadChanged(this);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void enableWhitelistFilter(int vendorId, int productId)
+/*     */   {
+/* 544 */     if (deviceWhitelist == null) {
+/* 545 */       deviceWhitelist = new HashSet();
+/*     */     }
+/* 547 */     deviceWhitelist.add(new DeviceId(vendorId, productId));
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public static void clearWhitelistFilter()
+/*     */   {
+/* 554 */     deviceWhitelist = null;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   @TargetApi(19)
+/*     */   public static synchronized boolean isGamepadDevice(int deviceId)
+/*     */   {
+/* 566 */     if (gameControllerDeviceIdCache.contains(Integer.valueOf(deviceId))) {
+/* 567 */       return true;
+/*     */     }
+/*     */     
+/* 570 */     gameControllerDeviceIdCache = new HashSet();
+/* 571 */     int[] deviceIds = InputDevice.getDeviceIds();
+/* 572 */     for (int id : deviceIds) {
+/* 573 */       InputDevice device = InputDevice.getDevice(id);
+/*     */       
+/* 575 */       int source = device.getSources();
+/* 576 */       if (((source & 0x401) == 1025) || ((source & 0x1000010) == 16777232))
+/*     */       {
+/*     */ 
+/* 579 */         if (Build.VERSION.SDK_INT >= 19)
+/*     */         {
+/*     */ 
+/* 582 */           if ((deviceWhitelist == null) || (deviceWhitelist.contains(new DeviceId(device.getVendorId(), device.getProductId()))))
+/*     */           {
+/* 584 */             gameControllerDeviceIdCache.add(Integer.valueOf(id));
+/*     */           }
+/*     */         } else {
+/* 587 */           gameControllerDeviceIdCache.add(Integer.valueOf(id));
+/*     */         }
+/*     */       }
+/*     */     }
+/*     */     
+/*     */ 
+/* 593 */     if (gameControllerDeviceIdCache.contains(Integer.valueOf(deviceId))) {
+/* 594 */       return true;
+/*     */     }
+/*     */     
+/* 597 */     return false;
+/*     */   }
+/*     */   
+/*     */   public static abstract interface GamepadCallback
+/*     */   {
+/*     */     public abstract void gamepadChanged(Gamepad paramGamepad);
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\Gamepad.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.hardware;
-
-import java.nio.BufferOverflowException;
-import java.nio.ByteBuffer;
-import java.util.HashSet;
-import java.util.Set;
-
-import com.qualcomm.robotcore.util.Range;
-import com.qualcomm.robotcore.util.RobotLog;
-
-/**
- * Monitor a hardware gamepad.
- * <p>
- * The buttons, analog sticks, and triggers are represented a public member variables that can be read from or written to
- * directly.
- * <p>
- * Analog sticks are represented as floats that range from -1.0 to +1.0. They will be 0.0 while at rest. The horizontal axis is
- * labeled x, and the vertical axis is labeled y.
- * <p>
- * Triggers are represented as floats that range from 0.0 to 1.0. They will be at 0.0 while at rest.
- * <p>
- * Buttons are boolean values. They will be true if the button is pressed, otherwise they will be false.
- * <p>
- * The dpad is represented as 4 buttons, dpad_up, dpad_down, dpad_left, and dpad_right
- */
-@SuppressWarnings("unused")
-public class Gamepad extends RobocolParsableBase {
-
-	/**
-	 * A gamepad with an ID equal to ID_UNASSOCIATED has not been associated with any device.
-	 */
-	public static final int ID_UNASSOCIATED = -1;
-
-	/**
-	 * Optional callback interface for monitoring changes due to MotionEvents and KeyEvents.
-	 *
-	 * This interface can be used to notify you if the gamepad changes due to either a KeyEvent or a
-	 * MotionEvent. It does not notify you if the gamepad changes for other reasons.
-	 */
-	public interface GamepadCallback {
-
-		/**
-		 * This method will be called whenever the gamepad state has changed due to either a KeyEvent
-		 * or a MotionEvent.
-		 * 
-		 * @param gamepad device which state has changed
-		 */
-		void gamepadChanged(Gamepad gamepad);
-	}
-
-	/**
-	 * left analog stick horizontal axis
-	 */
-	public float left_stick_x = 0f;
-
-	/**
-	 * left analog stick vertical axis
-	 */
-	public float left_stick_y = 0f;
-
-	/**
-	 * right analog stick horizontal axis
-	 */
-	public float right_stick_x = 0f;
-
-	/**
-	 * right analog stick vertical axis
-	 */
-	public float right_stick_y = 0f;
-
-	/**
-	 * dpad up
-	 */
-	public boolean dpad_up = false;
-
-	/**
-	 * dpad down
-	 */
-	public boolean dpad_down = false;
-
-	/**
-	 * dpad left
-	 */
-	public boolean dpad_left = false;
-
-	/**
-	 * dpad right
-	 */
-	public boolean dpad_right = false;
-
-	/**
-	 * button a
-	 */
-	public boolean a = false;
-
-	/**
-	 * button b
-	 */
-	public boolean b = false;
-
-	/**
-	 * button x
-	 */
-	public boolean x = false;
-
-	/**
-	 * button y
-	 */
-	public boolean y = false;
-
-	/**
-	 * button guide - often the large button in the middle of the controller. The OS may
-	 * capture this button before it is sent to the app; in which case you'll never
-	 * receive it.
-	 */
-	public boolean guide = false;
-
-	/**
-	 * button start
-	 */
-	public boolean start = false;
-
-	/**
-	 * button back
-	 */
-	public boolean back = false;
-
-	/**
-	 * button left bumper
-	 */
-	public boolean left_bumper = false;
-
-	/**
-	 * button right bumper
-	 */
-	public boolean right_bumper = false;
-
-	/**
-	 * left stick button
-	 */
-	public boolean left_stick_button = false;
-
-	/**
-	 * right stick button
-	 */
-	public boolean right_stick_button = false;
-
-	/**
-	 * left trigger
-	 */
-	public float left_trigger = 0f;
-
-	/**
-	 * right trigger
-	 */
-	public float right_trigger = 0f;
-
-	/**
-	 * Which user is this gamepad used by
-	 */
-	public byte user = ID_UNASSOCIATED;
-
-	/**
-	 * ID assigned to this gamepad by the OS. This value can change each time the device is plugged in
-	 */
-	public int id = ID_UNASSOCIATED;
-
-	/**
-	 * Relative timestamp of the last time an event was detected
-	 */
-	public long timestamp = 0;
-
-	/**
-	 * DPAD button will be considered pressed when the movement crosses this
-	 * threshold
-	 */
-	protected float dpadThreshold = 0.2f;
-
-	/**
-	 * If the motion value is less than the threshold, the controller will be
-	 * considered at rest
-	 */
-	protected float joystickDeadzone = 0.2f; // very high, since we don't know the device type
-
-	// private static values used for packaging the gamepad state into a byte array
-	private static final short PAYLOAD_SIZE = 42;
-	private static final short BUFFER_SIZE = PAYLOAD_SIZE + RobocolParsable.HEADER_LENGTH;
-
-	private static final byte ROBOCOL_VERSION = 2;
-
-	private static final float MAX_MOTION_RANGE = 1.0f;
-
-	private final GamepadCallback callback;
-
-	private static Set<Integer> gameControllerDeviceIdCache = new HashSet<Integer>();
-
-	// Set of devices to consume input events from. If null, inputs from all detected devices will be used.
-	private static Set<DeviceId> deviceWhitelist = null;
-
-	/**
-	 * Container class to identify a vendor/product ID combination.
-	 *
-	 * Reusing Map.Entry which provides appropriate .equals/.hashCode
-	 */
-	private static class DeviceId extends java.util.AbstractMap.SimpleEntry<Integer, Integer> {
-		private static final long serialVersionUID = -6429575391769944899L;
-
-		public DeviceId(final int vendorId, final int productId) {
-			super(vendorId, productId);
-		}
-
-		@SuppressWarnings("unused")
-		public int getVendorId() {
-			return getKey();
-		}
-
-		@SuppressWarnings("unused")
-		public int getProductId() {
-			return getValue();
-		}
-
-	}
-
-	public Gamepad() {
-		this(null);
-	}
-
-	public Gamepad(final GamepadCallback callback) {
-		this.callback = callback;
-	}
-
-	/**
-	 * Copy the state of a gamepad into this gamepad
-	 * 
-	 * @param gamepad state to be copied from
-	 * @throws RobotCoreException if the copy fails - gamepad will be in an unknown
-	 *             state if this exception is thrown
-	 */
-	public void copy(final Gamepad gamepad) throws RobotCoreException {
-		// reuse the serialization code; since that reduces the chances of bugs
-		fromByteArray(gamepad.toByteArray());
-	}
-
-	/**
-	 * Reset this gamepad into its initial state
-	 */
-	public void reset() {
-		try {
-			copy(new Gamepad());
-		} catch (final RobotCoreException e) {
-			// we should never hit this
-			RobotLog.e("Gamepad library in an invalid state");
-			throw new IllegalStateException("Gamepad library in an invalid state");
-		}
-	}
-
-	/**
-	 * Set the joystick deadzone. Must be between 0 and 1.
-	 * 
-	 * @param deadzone amount of joystick deadzone
-	 */
-	public void setJoystickDeadzone(final float deadzone) {
-		if (deadzone < 0 || deadzone > MAX_MOTION_RANGE) {
-			throw new IllegalArgumentException("deadzone cannot be greater than max joystick value");
-		}
-
-		joystickDeadzone = deadzone;
-	}
-
-	/**
-	 * Update the gamepad based on a MotionEvent
-	 * 
-	 * @param event motion event
-	 */
-	public void update(final android.view.MotionEvent event) {
-
-		id = event.getDeviceId();
-		timestamp = event.getEventTime();
-
-		left_stick_x = cleanMotionValues(event.getAxisValue(MotionEvent.AXIS_X));
-		left_stick_y = cleanMotionValues(event.getAxisValue(MotionEvent.AXIS_Y));
-		right_stick_x = cleanMotionValues(event.getAxisValue(MotionEvent.AXIS_Z));
-		right_stick_y = cleanMotionValues(event.getAxisValue(MotionEvent.AXIS_RZ));
-		left_trigger = event.getAxisValue(MotionEvent.AXIS_LTRIGGER);
-		right_trigger = event.getAxisValue(MotionEvent.AXIS_RTRIGGER);
-		dpad_down = event.getAxisValue(MotionEvent.AXIS_HAT_Y) > dpadThreshold;
-		dpad_up = event.getAxisValue(MotionEvent.AXIS_HAT_Y) < -dpadThreshold;
-		dpad_right = event.getAxisValue(MotionEvent.AXIS_HAT_X) > dpadThreshold;
-		dpad_left = event.getAxisValue(MotionEvent.AXIS_HAT_X) < -dpadThreshold;
-
-		callCallback();
-	}
-
-	/**
-	 * Update the gamepad based on a KeyEvent
-	 * 
-	 * @param event key event
-	 */
-	public void update(final android.view.KeyEvent event) {
-
-		id = event.getDeviceId();
-		timestamp = event.getEventTime();
-
-		final int key = event.getKeyCode();
-		if (key == KeyEvent.KEYCODE_DPAD_UP)
-			dpad_up = pressed(event);
-		else if (key == KeyEvent.KEYCODE_DPAD_DOWN)
-			dpad_down = pressed(event);
-		else if (key == KeyEvent.KEYCODE_DPAD_RIGHT)
-			dpad_right = pressed(event);
-		else if (key == KeyEvent.KEYCODE_DPAD_LEFT)
-			dpad_left = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_A)
-			a = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_B)
-			b = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_X)
-			x = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_Y)
-			y = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_MODE)
-			guide = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_START)
-			start = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_SELECT)
-			back = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_R1)
-			right_bumper = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_L1)
-			left_bumper = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_THUMBL)
-			left_stick_button = pressed(event);
-		else if (key == KeyEvent.KEYCODE_BUTTON_THUMBR) right_stick_button = pressed(event);
-
-		callCallback();
-	}
-
-	@Override
-	public MsgType getRobocolMsgType() {
-		return RobocolParsable.MsgType.GAMEPAD;
-	}
-
-	@Override
-	public byte[] toByteArray() throws RobotCoreException {
-
-		final ByteBuffer buffer = getWriteBuffer(PAYLOAD_SIZE);
-
-		try {
-			int buttons = 0;
-
-			buffer.put(ROBOCOL_VERSION);
-			buffer.putInt(id);
-			buffer.putLong(timestamp).array();
-			buffer.putFloat(left_stick_x).array();
-			buffer.putFloat(left_stick_y).array();
-			buffer.putFloat(right_stick_x).array();
-			buffer.putFloat(right_stick_y).array();
-			buffer.putFloat(left_trigger).array();
-			buffer.putFloat(right_trigger).array();
-
-			buttons = (buttons << 1) + (left_stick_button ? 1 : 0);
-			buttons = (buttons << 1) + (right_stick_button ? 1 : 0);
-			buttons = (buttons << 1) + (dpad_up ? 1 : 0);
-			buttons = (buttons << 1) + (dpad_down ? 1 : 0);
-			buttons = (buttons << 1) + (dpad_left ? 1 : 0);
-			buttons = (buttons << 1) + (dpad_right ? 1 : 0);
-			buttons = (buttons << 1) + (a ? 1 : 0);
-			buttons = (buttons << 1) + (b ? 1 : 0);
-			buttons = (buttons << 1) + (x ? 1 : 0);
-			buttons = (buttons << 1) + (y ? 1 : 0);
-			buttons = (buttons << 1) + (guide ? 1 : 0);
-			buttons = (buttons << 1) + (start ? 1 : 0);
-			buttons = (buttons << 1) + (back ? 1 : 0);
-			buttons = (buttons << 1) + (left_bumper ? 1 : 0);
-			buttons = (buttons << 1) + (right_bumper ? 1 : 0);
-			buffer.putInt(buttons);
-
-			buffer.put(user);
-		} catch (final BufferOverflowException e) {
-			RobotLog.logStacktrace(e);
-		}
-
-		return buffer.array();
-	}
-
-	@Override
-	public void fromByteArray(final byte[] byteArray) throws RobotCoreException {
-		if (byteArray.length < BUFFER_SIZE) {
-			throw new RobotCoreException("Expected buffer of at least " + BUFFER_SIZE + " bytes, received " + byteArray.length);
-		}
-
-		final ByteBuffer byteBuffer = getReadBuffer(byteArray);
-
-		int buttons = 0;
-
-		final byte version = byteBuffer.get();
-
-		// extract version 1 values
-		if (version >= 1) {
-			id = byteBuffer.getInt();
-			timestamp = byteBuffer.getLong();
-			left_stick_x = byteBuffer.getFloat();
-			left_stick_y = byteBuffer.getFloat();
-			right_stick_x = byteBuffer.getFloat();
-			right_stick_y = byteBuffer.getFloat();
-			left_trigger = byteBuffer.getFloat();
-			right_trigger = byteBuffer.getFloat();
-
-			buttons = byteBuffer.getInt();
-			left_stick_button = (buttons & 0x04000) != 0;
-			right_stick_button = (buttons & 0x02000) != 0;
-			dpad_up = (buttons & 0x01000) != 0;
-			dpad_down = (buttons & 0x00800) != 0;
-			dpad_left = (buttons & 0x00400) != 0;
-			dpad_right = (buttons & 0x00200) != 0;
-			a = (buttons & 0x00100) != 0;
-			b = (buttons & 0x00080) != 0;
-			x = (buttons & 0x00040) != 0;
-			y = (buttons & 0x00020) != 0;
-			guide = (buttons & 0x00010) != 0;
-			start = (buttons & 0x00008) != 0;
-			back = (buttons & 0x00004) != 0;
-			left_bumper = (buttons & 0x00002) != 0;
-			right_bumper = (buttons & 0x00001) != 0;
-		}
-
-		// extract version 2 values
-		if (version >= 2) {
-			user = byteBuffer.get();
-		}
-
-		callCallback();
-	}
-
-	/**
-	 * Are all analog sticks and triggers in their rest position?
-	 * 
-	 * @return true if all analog sticks and triggers are at rest; otherwise false
-	 */
-	public boolean atRest() {
-		return left_stick_x == 0f && left_stick_y == 0f && right_stick_x == 0f && right_stick_y == 0f && left_trigger == 0f && right_trigger == 0f;
-	}
-
-	/**
-	 * Get the type of gamepad as a String. This method defaults to "Standard".
-	 * 
-	 * @return gamepad type
-	 */
-	public String type() {
-		return "Standard";
-	}
-
-	/**
-	 * Display a summary of this gamepad, including the state of all buttons, analog sticks, and triggers
-	 * 
-	 * @return a summary
-	 */
-	@Override
-	public String toString() {
-		String buttons = new String();
-		if (dpad_up) buttons += "dpad_up ";
-		if (dpad_down) buttons += "dpad_down ";
-		if (dpad_left) buttons += "dpad_left ";
-		if (dpad_right) buttons += "dpad_right ";
-		if (a) buttons += "a ";
-		if (b) buttons += "b ";
-		if (x) buttons += "x ";
-		if (y) buttons += "y ";
-		if (guide) buttons += "guide ";
-		if (start) buttons += "start ";
-		if (back) buttons += "back ";
-		if (left_bumper) buttons += "left_bumper ";
-		if (right_bumper) buttons += "right_bumper ";
-		if (left_stick_button) buttons += "left stick button ";
-		if (right_stick_button) buttons += "right stick button ";
-
-		return String.format("ID: %2d user: %2d lx: % 1.2f ly: % 1.2f rx: % 1.2f ry: % 1.2f lt: %1.2f rt: %1.2f %s", id, user, left_stick_x, left_stick_y, right_stick_x, right_stick_y, left_trigger, right_trigger, buttons);
-	}
-
-	// clean values
-	// remove values larger than max
-	// apply deadzone logic
-	protected float cleanMotionValues(float number) {
-
-		// apply deadzone
-		if (number < joystickDeadzone && number > -joystickDeadzone) return 0.0f;
-
-		// apply trim
-		if (number > MAX_MOTION_RANGE) return MAX_MOTION_RANGE;
-		if (number < -MAX_MOTION_RANGE) return -MAX_MOTION_RANGE;
-
-		// scale values "between deadzone and trim" to be "between 0 and Max range"
-		if (number > 0)
-			number = (float) Range.scale(number, joystickDeadzone, MAX_MOTION_RANGE, 0, MAX_MOTION_RANGE);
-		else
-			number = (float) Range.scale(number, -joystickDeadzone, -MAX_MOTION_RANGE, 0, -MAX_MOTION_RANGE);
-
-		return number;
-	}
-
-	protected boolean pressed(final android.view.KeyEvent event) {
-		return event.getAction() == KeyEvent.ACTION_DOWN;
-	}
-
-	protected void callCallback() {
-		if (callback != null) callback.gamepadChanged(this);
-	}
-
-	/**
-	 * Add a whitelist filter for a specific device vendor/product ID.
-	 * <p>
-	 * This adds a whitelist to the gamepad detection method. If a device has been added to the whitelist, then only devices
-	 * that match the given vendor ID and product ID will be considered gamepads. This method can be called multiple times to
-	 * add multiple devices to the whitelist.
-	 * <p>
-	 * If no whitelist entries have been added, then the default OS detection methods will be used.
-	 * 
-	 * @param vendorId the vendor ID
-	 * @param productId the product ID
-	 */
-	public static void enableWhitelistFilter(final int vendorId, final int productId) {
-		if (deviceWhitelist == null) {
-			deviceWhitelist = new HashSet<DeviceId>();
-		}
-		deviceWhitelist.add(new DeviceId(vendorId, productId));
-	}
-
-	/**
-	 * Clear the device whitelist filter.
-	 */
-	public static void clearWhitelistFilter() {
-		deviceWhitelist = null;
-	}
-
-	/**
-	 * Does this device ID belong to a gamepad device?
-	 * 
-	 * @param deviceId device ID
-	 * @return true, if gamepad device; false otherwise
-	 */
-	@TargetApi(19)
-	public static synchronized boolean isGamepadDevice(final int deviceId) {
-
-		// check the cache
-		if (gameControllerDeviceIdCache.contains(deviceId)) return true;
-
-		// update game controllers cache, since a new controller might have been plugged in
-		gameControllerDeviceIdCache = new HashSet<Integer>();
-		final int[] deviceIds = InputDevice.getDeviceIds();
-		for (final int id : deviceIds) {
-			final InputDevice device = InputDevice.getDevice(id);
-
-			final int source = device.getSources();
-			if ((source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK) {
-
-				if (android.os.Build.VERSION.SDK_INT >= 19) {
-					// null mDeviceWhitelist means all devices are valid
-					// non-null mDeviceWhitelist means only use devices in mDeviceWhitelist
-					if (deviceWhitelist == null || deviceWhitelist.contains(new DeviceId(device.getVendorId(), device.getProductId()))) {
-						gameControllerDeviceIdCache.add(id);
-					}
-				} else {
-					gameControllerDeviceIdCache.add(id);
-				}
-			}
-		}
-
-		// check updated cache
-		if (gameControllerDeviceIdCache.contains(deviceId)) return true;
-
-		// this is not an event from a game pad
-		return false;
-	}
-}

@@ -1,28 +1,39 @@
-package com.qualcomm.robotcore.hardware;
+/*    */ package com.qualcomm.robotcore.hardware;
+/*    */ 
+/*    */ 
+/*    */ public class PWMOutputImplEx
+/*    */   extends PWMOutputImpl
+/*    */   implements PWMOutputEx
+/*    */ {
+/*    */   PWMOutputControllerEx controllerEx;
+/*    */   
+/*    */   public PWMOutputImplEx(PWMOutputController controller, int port)
+/*    */   {
+/* 12 */     super(controller, port);
+/* 13 */     this.controllerEx = ((PWMOutputControllerEx)controller);
+/*    */   }
+/*    */   
+/*    */ 
+/*    */   public void setPwmEnable()
+/*    */   {
+/* 19 */     this.controllerEx.setPwmEnable(this.port);
+/*    */   }
+/*    */   
+/*    */ 
+/*    */   public void setPwmDisable()
+/*    */   {
+/* 25 */     this.controllerEx.setPwmDisable(this.port);
+/*    */   }
+/*    */   
+/*    */ 
+/*    */   public boolean isPwmEnabled()
+/*    */   {
+/* 31 */     return this.controllerEx.isPwmEnabled(this.port);
+/*    */   }
+/*    */ }
 
-/**
- * Created by bob on 2016-03-12.
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\PWMOutputImplEx.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-public class PWMOutputImplEx extends PWMOutputImpl implements PWMOutputEx {
-	PWMOutputControllerEx controllerEx;
-
-	public PWMOutputImplEx(final PWMOutputController controller, final int port) {
-		super(controller, port);
-		controllerEx = (PWMOutputControllerEx) controller;
-	}
-
-	@Override
-	public void setPwmEnable() {
-		controllerEx.setPwmEnable(port);
-	}
-
-	@Override
-	public void setPwmDisable() {
-		controllerEx.setPwmDisable(port);
-	}
-
-	@Override
-	public boolean isPwmEnabled() {
-		return controllerEx.isPwmEnabled(port);
-	}
-}

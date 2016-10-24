@@ -1,129 +1,150 @@
-package com.qualcomm.robotcore.hardware;
+/*     */ package com.qualcomm.robotcore.hardware;
+/*     */ 
+/*     */ import com.qualcomm.robotcore.util.Range;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class CRServoImpl
+/*     */   implements CRServo
+/*     */ {
+/*  15 */   protected ServoController controller = null;
+/*  16 */   protected int portNumber = -1;
+/*  17 */   protected DcMotorSimple.Direction direction = DcMotorSimple.Direction.FORWARD;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   protected static final double apiPowerMin = -1.0D;
+/*     */   
+/*     */ 
+/*     */   protected static final double apiPowerMax = 1.0D;
+/*     */   
+/*     */ 
+/*     */   protected static final double apiServoPositionMin = 0.0D;
+/*     */   
+/*     */ 
+/*     */   protected static final double apiServoPositionMax = 1.0D;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public CRServoImpl(ServoController controller, int portNumber)
+/*     */   {
+/*  36 */     this(controller, portNumber, DcMotorSimple.Direction.FORWARD);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public CRServoImpl(ServoController controller, int portNumber, DcMotorSimple.Direction direction)
+/*     */   {
+/*  48 */     this.direction = direction;
+/*  49 */     this.controller = controller;
+/*  50 */     this.portNumber = portNumber;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public HardwareDevice.Manufacturer getManufacturer()
+/*     */   {
+/*  60 */     return this.controller.getManufacturer();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public String getDeviceName()
+/*     */   {
+/*  66 */     return "Continuous Rotation Servo";
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public String getConnectionInfo()
+/*     */   {
+/*  72 */     return this.controller.getConnectionInfo() + "; port " + this.portNumber;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public int getVersion()
+/*     */   {
+/*  78 */     return 1;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public synchronized void resetDeviceConfigurationForOpMode()
+/*     */   {
+/*  84 */     this.direction = DcMotorSimple.Direction.FORWARD;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void close() {}
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ServoController getController()
+/*     */   {
+/* 100 */     return this.controller;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public int getPortNumber()
+/*     */   {
+/* 106 */     return this.portNumber;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public synchronized void setDirection(DcMotorSimple.Direction direction)
+/*     */   {
+/* 112 */     this.direction = direction;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public synchronized DcMotorSimple.Direction getDirection()
+/*     */   {
+/* 118 */     return this.direction;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void setPower(double power)
+/*     */   {
+/* 130 */     if (this.direction == DcMotorSimple.Direction.REVERSE) power = -power;
+/* 131 */     power = Range.clip(power, -1.0D, 1.0D);
+/* 132 */     power = Range.scale(power, -1.0D, 1.0D, 0.0D, 1.0D);
+/* 133 */     this.controller.setServoPosition(this.portNumber, power);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public double getPower()
+/*     */   {
+/* 139 */     double power = this.controller.getServoPosition(this.portNumber);
+/* 140 */     power = Range.scale(power, 0.0D, 1.0D, -1.0D, 1.0D);
+/* 141 */     if (this.direction == DcMotorSimple.Direction.REVERSE) power = -power;
+/* 142 */     return power;
+/*     */   }
+/*     */ }
 
-import com.qualcomm.robotcore.util.Range;
 
-/**
- * ContinuousRotationServoImpl provides an implementation of continuous
- * rotation servo functionality
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\CRServoImpl.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-public class CRServoImpl implements CRServo {
-	// ----------------------------------------------------------------------------------------------
-	// State
-	// ----------------------------------------------------------------------------------------------
-
-	protected ServoController controller = null;
-	protected int portNumber = -1;
-	protected Direction direction = Direction.FORWARD;
-
-	protected static final double apiPowerMin = -1.0;
-	protected static final double apiPowerMax = 1.0;
-	protected static final double apiServoPositionMin = 0.0;
-	protected static final double apiServoPositionMax = 1.0;
-
-	// ------------------------------------------------------------------------------------------------
-	// Construction
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Constructor
-	 *
-	 * @param controller Servo controller that this servo is attached to
-	 * @param portNumber physical port number on the servo controller
-	 */
-	public CRServoImpl(final ServoController controller, final int portNumber) {
-		this(controller, portNumber, Direction.FORWARD);
-	}
-
-	/**
-	 * Constructor
-	 *
-	 * @param controller Servo controller that this servo is attached to
-	 * @param portNumber physical port number on the servo controller
-	 * @param direction FORWARD for normal operation, REVERSE to reverse operation
-	 */
-	public CRServoImpl(final ServoController controller, final int portNumber, final Direction direction) {
-		this.direction = direction;
-		this.controller = controller;
-		this.portNumber = portNumber;
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// HardwareDevice interface
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public Manufacturer getManufacturer() {
-		return controller.getManufacturer();
-	}
-
-	@Override
-	public String getDeviceName() {
-		return "Continuous Rotation Servo";
-	}
-
-	@Override
-	public String getConnectionInfo() {
-		return controller.getConnectionInfo() + "; port " + portNumber;
-	}
-
-	@Override
-	public int getVersion() {
-		return 1;
-	}
-
-	@Override
-	public synchronized void resetDeviceConfigurationForOpMode() {
-		direction = Direction.FORWARD;
-	}
-
-	@Override
-	public void close() {
-		// take no action
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// ContinuousRotationServo interface
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public ServoController getController() {
-		return controller;
-	}
-
-	@Override
-	public int getPortNumber() {
-		return portNumber;
-	}
-
-	@Override
-	public synchronized void setDirection(final Direction direction) {
-		this.direction = direction;
-	}
-
-	@Override
-	public synchronized Direction getDirection() {
-		return direction;
-	}
-
-	@Override
-	public void setPower(double power) {
-		// For CR Servos on MR/HiTechnic hardware, internal positions relate to speed as follows:
-		//
-		// 0 == full speed reverse
-		// 128 == stopped
-		// 255 == full speed forward
-		//
-		if (direction == Direction.REVERSE) power = -power;
-		power = Range.clip(power, apiPowerMin, apiPowerMax);
-		power = Range.scale(power, apiPowerMin, apiPowerMax, apiServoPositionMin, apiServoPositionMax);
-		controller.setServoPosition(portNumber, power);
-	}
-
-	@Override
-	public double getPower() {
-		double power = controller.getServoPosition(portNumber);
-		power = Range.scale(power, apiServoPositionMin, apiServoPositionMax, apiPowerMin, apiPowerMax);
-		if (direction == Direction.REVERSE) power = -power;
-		return power;
-	}
-}

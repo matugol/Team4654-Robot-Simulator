@@ -1,87 +1,86 @@
-/*
- * Copyright (c) 2015 Qualcomm Technologies Inc
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification, are permitted
- * (subject to the limitations in the disclaimer below) provided that the following conditions are
- * met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list of conditions
- * and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
- * and the following disclaimer in the documentation and/or other materials provided with the
- * distribution.
- * 
- * Neither the name of Qualcomm Technologies Inc nor the names of its contributors may be used to
- * endorse or promote products derived from this software without specific prior written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
- * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
- * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*    */ package com.qualcomm.robotcore.hardware;
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ public class LED
+/*    */   implements HardwareDevice
+/*    */ {
+/* 35 */   private DigitalChannelController controller = null;
+/* 36 */   private int physicalPort = -1;
+/*    */   
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */   public LED(DigitalChannelController controller, int physicalPort)
+/*    */   {
+/* 44 */     this.controller = controller;
+/* 45 */     this.physicalPort = physicalPort;
+/*    */     
+/* 47 */     controller.setDigitalChannelMode(physicalPort, DigitalChannelController.Mode.OUTPUT);
+/*    */   }
+/*    */   
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */   public void enable(boolean set)
+/*    */   {
+/* 55 */     this.controller.setDigitalChannelState(this.physicalPort, set);
+/*    */   }
+/*    */   
+/*    */   public HardwareDevice.Manufacturer getManufacturer() {
+/* 59 */     return this.controller.getManufacturer();
+/*    */   }
+/*    */   
+/*    */   public String getDeviceName()
+/*    */   {
+/* 64 */     return "LED";
+/*    */   }
+/*    */   
+/*    */   public String getConnectionInfo()
+/*    */   {
+/* 69 */     return String.format("%s; port %d", new Object[] { this.controller.getConnectionInfo(), Integer.valueOf(this.physicalPort) });
+/*    */   }
+/*    */   
+/*    */   public int getVersion()
+/*    */   {
+/* 74 */     return 0;
+/*    */   }
+/*    */   
+/*    */   public void resetDeviceConfigurationForOpMode() {}
+/*    */   
+/*    */   public void close() {}
+/*    */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\LED.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.hardware;
-
-public class LED implements HardwareDevice {
-
-	private DigitalChannelController controller = null;
-	private int physicalPort = -1;
-
-	/***
-	 * Constructor
-	 * 
-	 * @param controller Digital Channel Controller this LED is attached to
-	 * @param physicalPort the physical port it's plugged into.
-	 */
-	public LED(final DigitalChannelController controller, final int physicalPort) {
-		this.controller = controller;
-		this.physicalPort = physicalPort;
-
-		controller.setDigitalChannelMode(physicalPort, DigitalChannelController.Mode.OUTPUT);
-	}
-
-	/**
-	 * A method to turn on or turn off the LED
-	 * 
-	 * @param set - true turns it on, false turns it off.
-	 */
-	public void enable(final boolean set) {
-		controller.setDigitalChannelState(physicalPort, set);
-	}
-
-	@Override
-	public Manufacturer getManufacturer() {
-		return controller.getManufacturer();
-	}
-
-	@Override
-	public String getDeviceName() {
-		return "LED";
-	}
-
-	@Override
-	public String getConnectionInfo() {
-		return String.format("%s; port %d", controller.getConnectionInfo(), physicalPort);
-	}
-
-	@Override
-	public int getVersion() {
-		return 0;
-	}
-
-	@Override
-	public void resetDeviceConfigurationForOpMode() {}
-
-	@Override
-	public void close() {
-
-	}
-}

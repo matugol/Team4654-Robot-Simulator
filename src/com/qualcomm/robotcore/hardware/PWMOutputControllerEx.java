@@ -1,12 +1,16 @@
 package com.qualcomm.robotcore.hardware;
 
-/**
- * Created by bob on 2016-03-12.
- */
-public interface PWMOutputControllerEx {
-	void setPwmEnable(int port);
-
-	void setPwmDisable(int port);
-
-	boolean isPwmEnabled(int port);
+public abstract interface PWMOutputControllerEx
+{
+  public abstract void setPwmEnable(int paramInt);
+  
+  public abstract void setPwmDisable(int paramInt);
+  
+  public abstract boolean isPwmEnabled(int paramInt);
 }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\PWMOutputControllerEx.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
+ */

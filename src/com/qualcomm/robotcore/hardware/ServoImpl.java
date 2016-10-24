@@ -1,215 +1,204 @@
-/*
- * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- * 
- * Neither the name of Qualcomm Technologies Inc nor the names of its contributors
- * may be used to endorse or promote products derived from this software without
- * specific prior written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.hardware;
+/*     */ 
+/*     */ import com.qualcomm.robotcore.util.Range;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class ServoImpl
+/*     */   implements Servo
+/*     */ {
+/*  45 */   protected ServoController controller = null;
+/*  46 */   protected int portNumber = -1;
+/*     */   
+/*  48 */   protected Servo.Direction direction = Servo.Direction.FORWARD;
+/*  49 */   protected double limitPositionMin = 0.0D;
+/*  50 */   protected double limitPositionMax = 1.0D;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ServoImpl(ServoController controller, int portNumber)
+/*     */   {
+/*  62 */     this(controller, portNumber, Servo.Direction.FORWARD);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ServoImpl(ServoController controller, int portNumber, Servo.Direction direction)
+/*     */   {
+/*  72 */     this.direction = direction;
+/*  73 */     this.controller = controller;
+/*  74 */     this.portNumber = portNumber;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public HardwareDevice.Manufacturer getManufacturer()
+/*     */   {
+/*  82 */     return this.controller.getManufacturer();
+/*     */   }
+/*     */   
+/*     */   public String getDeviceName()
+/*     */   {
+/*  87 */     return "Servo";
+/*     */   }
+/*     */   
+/*     */   public String getConnectionInfo()
+/*     */   {
+/*  92 */     return this.controller.getConnectionInfo() + "; port " + this.portNumber;
+/*     */   }
+/*     */   
+/*     */   public int getVersion()
+/*     */   {
+/*  97 */     return 1;
+/*     */   }
+/*     */   
+/*     */   public synchronized void resetDeviceConfigurationForOpMode()
+/*     */   {
+/* 102 */     this.limitPositionMin = 0.0D;
+/* 103 */     this.limitPositionMax = 1.0D;
+/* 104 */     this.direction = Servo.Direction.FORWARD;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void close() {}
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ServoController getController()
+/*     */   {
+/* 121 */     return this.controller;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public synchronized void setDirection(Servo.Direction direction)
+/*     */   {
+/* 129 */     this.direction = direction;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public Servo.Direction getDirection()
+/*     */   {
+/* 137 */     return this.direction;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public int getPortNumber()
+/*     */   {
+/* 145 */     return this.portNumber;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public synchronized void setPosition(double position)
+/*     */   {
+/* 156 */     position = Range.clip(position, 0.0D, 1.0D);
+/* 157 */     if (this.direction == Servo.Direction.REVERSE) position = reverse(position);
+/* 158 */     double scaled = Range.scale(position, 0.0D, 1.0D, this.limitPositionMin, this.limitPositionMax);
+/* 159 */     internalSetPosition(scaled);
+/*     */   }
+/*     */   
+/*     */   protected void internalSetPosition(double position) {
+/* 163 */     this.controller.setServoPosition(this.portNumber, position);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public synchronized double getPosition()
+/*     */   {
+/* 174 */     double position = this.controller.getServoPosition(this.portNumber);
+/* 175 */     if (this.direction == Servo.Direction.REVERSE) position = reverse(position);
+/* 176 */     double scaled = Range.scale(position, this.limitPositionMin, this.limitPositionMax, 0.0D, 1.0D);
+/* 177 */     return Range.clip(scaled, 0.0D, 1.0D);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public synchronized void scaleRange(double min, double max)
+/*     */   {
+/* 184 */     min = Range.clip(min, 0.0D, 1.0D);
+/* 185 */     max = Range.clip(max, 0.0D, 1.0D);
+/*     */     
+/* 187 */     if (min >= max) {
+/* 188 */       throw new IllegalArgumentException("min must be less than max");
+/*     */     }
+/*     */     
+/* 191 */     this.limitPositionMin = min;
+/* 192 */     this.limitPositionMax = max;
+/*     */   }
+/*     */   
+/*     */   private double reverse(double position) {
+/* 196 */     return 1.0D - position + 0.0D;
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\ServoImpl.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.hardware;
-
-import com.qualcomm.robotcore.util.Range;
-
-/**
- * Control a single servo
- */
-public class ServoImpl implements Servo {
-
-	// ------------------------------------------------------------------------------------------------
-	// State
-	// ------------------------------------------------------------------------------------------------
-
-	protected ServoController controller = null;
-	protected int portNumber = -1;
-
-	protected Direction direction = Direction.FORWARD;
-	protected double limitPositionMin = MIN_POSITION;
-	protected double limitPositionMax = MAX_POSITION;
-
-	// ------------------------------------------------------------------------------------------------
-	// Construction
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Constructor
-	 *
-	 * @param controller Servo controller that this servo is attached to
-	 * @param portNumber physical port number on the servo controller
-	 */
-	public ServoImpl(final ServoController controller, final int portNumber) {
-		this(controller, portNumber, Direction.FORWARD);
-	}
-
-	/**
-	 * COnstructor
-	 *
-	 * @param controller Servo controller that this servo is attached to
-	 * @param portNumber physical port number on the servo controller
-	 * @param direction FORWARD for normal operation, REVERSE to reverse operation
-	 */
-	public ServoImpl(final ServoController controller, final int portNumber, final Direction direction) {
-		this.direction = direction;
-		this.controller = controller;
-		this.portNumber = portNumber;
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// HardwareDevice interface
-	// ------------------------------------------------------------------------------------------------
-
-	@Override
-	public Manufacturer getManufacturer() {
-		return controller.getManufacturer();
-	}
-
-	@Override
-	public String getDeviceName() {
-		return "Servo";
-	}
-
-	@Override
-	public String getConnectionInfo() {
-		return controller.getConnectionInfo() + "; port " + portNumber;
-	}
-
-	@Override
-	public int getVersion() {
-		return 1;
-	}
-
-	@Override
-	public synchronized void resetDeviceConfigurationForOpMode() {
-		limitPositionMin = MIN_POSITION;
-		limitPositionMax = MAX_POSITION;
-		direction = Direction.FORWARD;
-	}
-
-	@Override
-	public void close() {
-		// take no action
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Servo operations
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Get Servo Controller
-	 *
-	 * @return servo controller
-	 */
-	@Override
-	public ServoController getController() {
-		return controller;
-	}
-
-	/**
-	 * Set the direction
-	 *
-	 * @param direction direction
-	 */
-	@Override
-	synchronized public void setDirection(final Direction direction) {
-		this.direction = direction;
-	}
-
-	/**
-	 * Get the direction
-	 *
-	 * @return direction
-	 */
-	@Override
-	public Direction getDirection() {
-		return direction;
-	}
-
-	/**
-	 * Get Channel
-	 *
-	 * @return channel
-	 */
-	@Override
-	public int getPortNumber() {
-		return portNumber;
-	}
-
-	/**
-	 * Commands the servo to move to a designated position. This method initiates the movement;
-	 * the servo will arrive at the commanded position at some later time.
-	 *
-	 * @param position the commanded servo position. Should be in the range [0.0, 1.0].
-	 * @see #getPosition()
-	 */
-	@Override
-	synchronized public void setPosition(final double positionPar) {
-		double position = Range.clip(positionPar, MIN_POSITION, MAX_POSITION);
-		if (direction == Direction.REVERSE) position = reverse(position);
-		final double scaled = Range.scale(position, MIN_POSITION, MAX_POSITION, limitPositionMin, limitPositionMax);
-		internalSetPosition(scaled);
-	}
-
-	protected void internalSetPosition(final double position) {
-		controller.setServoPosition(portNumber, position);
-	}
-
-	/**
-	 * Returns the position to which the servo was last commanded, or Double.NaN if that is
-	 * unavailable.
-	 *
-	 * @return the last commanded position
-	 * @see #setPosition(double)
-	 * @see Double#isNaN(double)
-	 */
-	@Override
-	synchronized public double getPosition() {
-		double position = controller.getServoPosition(portNumber);
-		if (direction == Direction.REVERSE) position = reverse(position);
-		final double scaled = Range.scale(position, limitPositionMin, limitPositionMax, MIN_POSITION, MAX_POSITION);
-		return Range.clip(scaled, MIN_POSITION, MAX_POSITION);
-	}
-
-	/**
-	 * Automatically scales the position of the servo.
-	 */
-	@Override
-	synchronized public void scaleRange(final double minPar, final double maxPar) {
-		final double min = Range.clip(minPar, MIN_POSITION, MAX_POSITION);
-		final double max = Range.clip(maxPar, MIN_POSITION, MAX_POSITION);
-
-		if (min >= max) {
-			throw new IllegalArgumentException("min must be less than max");
-		}
-
-		limitPositionMin = min;
-		limitPositionMax = max;
-	}
-
-	private double reverse(final double position) {
-		return MAX_POSITION - position + MIN_POSITION;
-	}
-}

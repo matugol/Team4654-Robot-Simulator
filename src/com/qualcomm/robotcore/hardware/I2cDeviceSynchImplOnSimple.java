@@ -1,417 +1,518 @@
-/*
- * Copyright (c) 2016 Robert Atkinson
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- * 
- * Neither the name of Robert Atkinson nor the names of his contributors may be used to
- * endorse or promote products derived from this software without specific prior
- * written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESSFOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.hardware;
+/*     */ 
+/*     */ import com.qualcomm.robotcore.util.ThreadPool;
+/*     */ import java.util.Arrays;
+/*     */ import java.util.concurrent.ScheduledExecutorService;
+/*     */ import java.util.concurrent.TimeUnit;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class I2cDeviceSynchImplOnSimple
+/*     */   implements I2cDeviceSynch
+/*     */ {
+/*     */   protected I2cDeviceSynchSimple i2cDeviceSynchSimple;
+/*     */   protected boolean isSimpleOwned;
+/*     */   protected I2cDeviceSynch.ReadWindow readWindow;
+/*     */   protected int iregReadLast;
+/*     */   protected int cregReadLast;
+/*     */   protected int iregWriteLast;
+/*     */   protected byte[] rgbWriteLast;
+/*     */   protected boolean isHooked;
+/*     */   protected boolean isEngaged;
+/*     */   protected boolean isClosing;
+/*     */   protected int msHeartbeatInterval;
+/*     */   protected I2cDeviceSynch.HeartbeatAction heartbeatAction;
+/*     */   protected ScheduledExecutorService heartbeatExecutor;
+/*  68 */   protected final Object engagementLock = new Object();
+/*  69 */   protected final Object concurrentClientLock = new Object();
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public I2cDeviceSynchImplOnSimple(I2cDeviceSynchSimple simple, boolean isSimpleOwned)
+/*     */   {
+/*  77 */     this.i2cDeviceSynchSimple = simple;
+/*  78 */     this.isSimpleOwned = isSimpleOwned;
+/*     */     
+/*  80 */     this.msHeartbeatInterval = 0;
+/*  81 */     this.heartbeatAction = null;
+/*  82 */     this.heartbeatExecutor = null;
+/*  83 */     this.readWindow = null;
+/*  84 */     this.cregReadLast = 0;
+/*  85 */     this.rgbWriteLast = null;
+/*  86 */     this.isEngaged = false;
+/*  87 */     this.isHooked = false;
+/*  88 */     this.isClosing = false;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void setLogging(boolean enabled)
+/*     */   {
+/*  98 */     this.i2cDeviceSynchSimple.setLogging(enabled);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void setLoggingTag(String loggingTag)
+/*     */   {
+/* 104 */     this.i2cDeviceSynchSimple.setLoggingTag(loggingTag);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void engage()
+/*     */   {
+/* 118 */     synchronized (this.engagementLock)
+/*     */     {
+/* 120 */       this.isEngaged = true;
+/* 121 */       adjustHooking();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   protected void hook()
+/*     */   {
+/* 132 */     synchronized (this.engagementLock)
+/*     */     {
+/* 134 */       if (!this.isHooked)
+/*     */       {
+/* 136 */         startHeartBeat();
+/* 137 */         this.isHooked = true;
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   protected void adjustHooking()
+/*     */   {
+/* 145 */     synchronized (this.engagementLock)
+/*     */     {
+/* 147 */       if ((!this.isHooked) && (this.isEngaged)) {
+/* 148 */         hook();
+/* 149 */       } else if ((this.isHooked) && (!this.isEngaged)) {
+/* 150 */         unhook();
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public boolean isEngaged() {
+/* 156 */     return this.isEngaged;
+/*     */   }
+/*     */   
+/*     */   public boolean isArmed()
+/*     */   {
+/* 161 */     synchronized (this.engagementLock)
+/*     */     {
+/* 163 */       if (this.isHooked)
+/*     */       {
+/* 165 */         return this.i2cDeviceSynchSimple.isArmed();
+/*     */       }
+/* 167 */       return false;
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public void disengage()
+/*     */   {
+/* 173 */     synchronized (this.engagementLock)
+/*     */     {
+/* 175 */       this.isEngaged = false;
+/* 176 */       adjustHooking();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void unhook()
+/*     */   {
+/* 182 */     synchronized (this.engagementLock)
+/*     */     {
+/* 184 */       if (this.isHooked)
+/*     */       {
+/* 186 */         stopHeartBeat();
+/* 187 */         synchronized (this.concurrentClientLock)
+/*     */         {
+/* 189 */           waitForWriteCompletions();
+/* 190 */           this.isHooked = false;
+/*     */         }
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void setHeartbeatInterval(int ms)
+/*     */   {
+/* 203 */     synchronized (this.concurrentClientLock)
+/*     */     {
+/* 205 */       this.msHeartbeatInterval = Math.max(0, this.msHeartbeatInterval);
+/* 206 */       stopHeartBeat();
+/* 207 */       startHeartBeat();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public int getHeartbeatInterval()
+/*     */   {
+/* 214 */     return this.msHeartbeatInterval;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void setHeartbeatAction(I2cDeviceSynch.HeartbeatAction action)
+/*     */   {
+/* 220 */     this.heartbeatAction = action;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public I2cDeviceSynch.HeartbeatAction getHeartbeatAction()
+/*     */   {
+/* 226 */     return this.heartbeatAction;
+/*     */   }
+/*     */   
+/*     */   void startHeartBeat()
+/*     */   {
+/* 231 */     if (this.msHeartbeatInterval > 0)
+/*     */     {
+/* 233 */       this.heartbeatExecutor = ThreadPool.newSingleThreadScheduledExecutor();
+/* 234 */       this.heartbeatExecutor.scheduleAtFixedRate(new Runnable()
+/*     */       {
+/*     */         public void run()
+/*     */         {
+/* 238 */           I2cDeviceSynch.HeartbeatAction action = I2cDeviceSynchImplOnSimple.this.getHeartbeatAction();
+/* 239 */           if (action != null)
+/*     */           {
+/* 241 */             synchronized (I2cDeviceSynchImplOnSimple.this.concurrentClientLock)
+/*     */             {
+/* 243 */               if ((action.rereadLastRead) && (I2cDeviceSynchImplOnSimple.this.cregReadLast != 0))
+/*     */               {
+/* 245 */                 I2cDeviceSynchImplOnSimple.this.read(I2cDeviceSynchImplOnSimple.this.iregReadLast, I2cDeviceSynchImplOnSimple.this.cregReadLast);
+/* 246 */                 return;
+/*     */               }
+/* 248 */               if ((action.rewriteLastWritten) && (I2cDeviceSynchImplOnSimple.this.rgbWriteLast != null))
+/*     */               {
+/* 250 */                 I2cDeviceSynchImplOnSimple.this.write(I2cDeviceSynchImplOnSimple.this.iregWriteLast, I2cDeviceSynchImplOnSimple.this.rgbWriteLast);
+/* 251 */                 return;
+/*     */               }
+/* 253 */               if (action.heartbeatReadWindow != null)
+/*     */               {
+/* 255 */                 I2cDeviceSynchImplOnSimple.this.read(action.heartbeatReadWindow.getRegisterFirst(), action.heartbeatReadWindow.getRegisterCount()); } } } } }, 0L, this.msHeartbeatInterval, TimeUnit.MILLISECONDS);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   void stopHeartBeat()
+/*     */   {
+/* 266 */     if (this.heartbeatExecutor != null)
+/*     */     {
+/* 268 */       this.heartbeatExecutor.shutdownNow();
+/* 269 */       ThreadPool.awaitTerminationOrExitApplication(this.heartbeatExecutor, 2L, TimeUnit.SECONDS, "heartbeat executor", "internal error");
+/* 270 */       this.heartbeatExecutor = null;
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void setReadWindow(I2cDeviceSynch.ReadWindow window)
+/*     */   {
+/* 281 */     synchronized (this.concurrentClientLock)
+/*     */     {
+/* 283 */       this.readWindow = window.readableCopy();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   /* Error */
+/*     */   public I2cDeviceSynch.ReadWindow getReadWindow()
+/*     */   {
+/*     */     // Byte code:
+/*     */     //   0: aload_0
+/*     */     //   1: getfield 4	com/qualcomm/robotcore/hardware/I2cDeviceSynchImplOnSimple:concurrentClientLock	Ljava/lang/Object;
+/*     */     //   4: dup
+/*     */     //   5: astore_1
+/*     */     //   6: monitorenter
+/*     */     //   7: aload_0
+/*     */     //   8: getfield 10	com/qualcomm/robotcore/hardware/I2cDeviceSynchImplOnSimple:readWindow	Lcom/qualcomm/robotcore/hardware/I2cDeviceSynch$ReadWindow;
+/*     */     //   11: aload_1
+/*     */     //   12: monitorexit
+/*     */     //   13: areturn
+/*     */     //   14: astore_2
+/*     */     //   15: aload_1
+/*     */     //   16: monitorexit
+/*     */     //   17: aload_2
+/*     */     //   18: athrow
+/*     */     // Line number table:
+/*     */     //   Java source line #290	-> byte code offset #0
+/*     */     //   Java source line #292	-> byte code offset #7
+/*     */     //   Java source line #293	-> byte code offset #14
+/*     */     // Local variable table:
+/*     */     //   start	length	slot	name	signature
+/*     */     //   0	19	0	this	I2cDeviceSynchImplOnSimple
+/*     */     //   5	11	1	Ljava/lang/Object;	Object
+/*     */     //   14	4	2	localObject1	Object
+/*     */     // Exception table:
+/*     */     //   from	to	target	type
+/*     */     //   7	13	14	finally
+/*     */     //   14	17	14	finally
+/*     */   }
+/*     */   
+/*     */   public void ensureReadWindow(I2cDeviceSynch.ReadWindow windowNeeded, I2cDeviceSynch.ReadWindow windowToSet)
+/*     */   {
+/* 299 */     synchronized (this.concurrentClientLock)
+/*     */     {
+/* 301 */       if ((this.readWindow == null) || (!this.readWindow.containsWithSameMode(windowNeeded)))
+/*     */       {
+/* 303 */         setReadWindow(windowToSet);
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public I2cDeviceSynchSimple.TimestampedData readTimeStamped(int ireg, int creg, I2cDeviceSynch.ReadWindow readWindowNeeded, I2cDeviceSynch.ReadWindow readWindowSet)
+/*     */   {
+/* 311 */     ensureReadWindow(readWindowNeeded, readWindowSet);
+/* 312 */     return readTimeStamped(ireg, creg);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public HardwareDevice.Manufacturer getManufacturer()
+/*     */   {
+/* 322 */     return this.i2cDeviceSynchSimple.getManufacturer();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public String getDeviceName()
+/*     */   {
+/* 328 */     return this.i2cDeviceSynchSimple.getDeviceName();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public String getConnectionInfo()
+/*     */   {
+/* 334 */     return this.i2cDeviceSynchSimple.getConnectionInfo();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public int getVersion()
+/*     */   {
+/* 340 */     return this.i2cDeviceSynchSimple.getVersion();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void resetDeviceConfigurationForOpMode()
+/*     */   {
+/* 346 */     this.i2cDeviceSynchSimple.resetDeviceConfigurationForOpMode();
+/* 347 */     this.readWindow = null;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public void close()
+/*     */   {
+/* 354 */     this.isClosing = true;
+/* 355 */     disengage();
+/* 356 */     if (this.isSimpleOwned)
+/*     */     {
+/* 358 */       this.i2cDeviceSynchSimple.close();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   protected boolean isOpenForReading()
+/*     */   {
+/* 368 */     return (this.isHooked) && (newReadsAndWritesAllowed());
+/*     */   }
+/*     */   
+/*     */   protected boolean isOpenForWriting() {
+/* 372 */     return (this.isHooked) && (newReadsAndWritesAllowed());
+/*     */   }
+/*     */   
+/*     */   protected boolean newReadsAndWritesAllowed() {
+/* 376 */     return !this.isClosing;
+/*     */   }
+/*     */   
+/*     */   public void setI2cAddress(I2cAddr newAddress)
+/*     */   {
+/* 381 */     setI2cAddr(newAddress);
+/*     */   }
+/*     */   
+/*     */   public I2cAddr getI2cAddress()
+/*     */   {
+/* 386 */     return getI2cAddr();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void setI2cAddr(I2cAddr i2cAddr)
+/*     */   {
+/* 392 */     this.i2cDeviceSynchSimple.setI2cAddr(i2cAddr);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public I2cAddr getI2cAddr()
+/*     */   {
+/* 398 */     return this.i2cDeviceSynchSimple.getI2cAddr();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public synchronized byte read8(int ireg)
+/*     */   {
+/* 404 */     return read(ireg, 1)[0];
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public byte[] read(int ireg, int creg)
+/*     */   {
+/* 410 */     return readTimeStamped(ireg, creg).data;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public I2cDeviceSynchSimple.TimestampedData readTimeStamped(int ireg, int creg)
+/*     */   {
+/* 416 */     synchronized (this.concurrentClientLock)
+/*     */     {
+/* 418 */       if (!isOpenForReading()) {
+/* 419 */         return I2cDeviceSynchImpl.makeFakeData(ireg, creg);
+/*     */       }
+/* 421 */       this.iregReadLast = ireg;
+/* 422 */       this.cregReadLast = creg;
+/* 423 */       if ((this.readWindow != null) && (this.readWindow.contains(ireg, creg)))
+/*     */       {
+/* 425 */         I2cDeviceSynchSimple.TimestampedData windowedData = this.i2cDeviceSynchSimple.readTimeStamped(this.readWindow.getRegisterFirst(), this.readWindow.getRegisterCount());
+/* 426 */         int ibFirst = ireg - this.readWindow.getRegisterFirst();
+/* 427 */         I2cDeviceSynchSimple.TimestampedData result = new I2cDeviceSynchSimple.TimestampedData();
+/* 428 */         result.data = Arrays.copyOfRange(windowedData.data, ibFirst, ibFirst + creg);
+/* 429 */         result.nanoTime = windowedData.nanoTime;
+/* 430 */         return result;
+/*     */       }
+/*     */       
+/*     */ 
+/* 434 */       return this.i2cDeviceSynchSimple.readTimeStamped(ireg, creg);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public void write8(int ireg, int bVal)
+/*     */   {
+/* 442 */     write8(ireg, bVal, false);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void write8(int ireg, int bVal, boolean waitForCompletion)
+/*     */   {
+/* 448 */     write(ireg, new byte[] { (byte)bVal }, waitForCompletion);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void write(int ireg, byte[] data)
+/*     */   {
+/* 454 */     write(ireg, data, false);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void write(int ireg, byte[] data, boolean waitForCompletion)
+/*     */   {
+/* 460 */     synchronized (this.concurrentClientLock)
+/*     */     {
+/* 462 */       if (!isOpenForWriting()) {
+/* 463 */         return;
+/*     */       }
+/* 465 */       this.iregWriteLast = ireg;
+/* 466 */       this.rgbWriteLast = Arrays.copyOf(data, data.length);
+/* 467 */       this.i2cDeviceSynchSimple.write(ireg, data, waitForCompletion);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void waitForWriteCompletions()
+/*     */   {
+/* 474 */     this.i2cDeviceSynchSimple.waitForWriteCompletions();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void enableWriteCoalescing(boolean enable)
+/*     */   {
+/* 480 */     this.i2cDeviceSynchSimple.enableWriteCoalescing(enable);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public boolean isWriteCoalescingEnabled()
+/*     */   {
+/* 486 */     return this.i2cDeviceSynchSimple.isWriteCoalescingEnabled();
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\hardware\I2cDeviceSynchImplOnSimple.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-package com.qualcomm.robotcore.hardware;
-
-import java.util.Arrays;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-/**
- * I2cDeviceSynchImplOnSimple takes an I2cDeviceSynchSimple and adds to it heartbeat and
- * readwindow functionality.
- */
-public class I2cDeviceSynchImplOnSimple implements I2cDeviceSynch {
-	// ----------------------------------------------------------------------------------------------
-	// State
-	// ----------------------------------------------------------------------------------------------
-
-	protected I2cDeviceSynchSimple i2cDeviceSynchSimple;
-	protected boolean isSimpleOwned;
-
-	protected ReadWindow readWindow; // the set of registers to look at when we are in read mode. May be null, indicating no
-// read needed
-
-	protected int iregReadLast, cregReadLast;
-	protected int iregWriteLast;
-	protected byte[] rgbWriteLast;
-
-	protected boolean isHooked; // whether we are connected to the underling device or not
-	protected boolean isEngaged; // user's hooking *intent*
-	protected boolean isClosing;
-
-	protected int msHeartbeatInterval; // time between heartbeats; zero is 'none necessary'
-	protected HeartbeatAction heartbeatAction; // the action to take when a heartbeat is needed. May be null.
-	protected ScheduledExecutorService heartbeatExecutor; // used to schedule heartbeats when we need to read from the outside
-
-	protected final Object engagementLock = new Object();
-	protected final Object concurrentClientLock = new Object(); // the lock we use to serialize against concurrent clients of
-// us.
-
-	// ----------------------------------------------------------------------------------------------
-	// Construction
-	// ----------------------------------------------------------------------------------------------
-
-	public I2cDeviceSynchImplOnSimple(final I2cDeviceSynchSimple simple, final boolean isSimpleOwned) {
-		i2cDeviceSynchSimple = simple;
-		this.isSimpleOwned = isSimpleOwned;
-
-		msHeartbeatInterval = 0;
-		heartbeatAction = null;
-		heartbeatExecutor = null;
-		readWindow = null;
-		cregReadLast = 0;
-		rgbWriteLast = null;
-		isEngaged = false;
-		isHooked = false;
-		isClosing = false;
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// Logging
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public void setLogging(final boolean enabled) {
-		i2cDeviceSynchSimple.setLogging(enabled);
-	}
-
-	@Override
-	public void setLoggingTag(final String loggingTag) {
-		i2cDeviceSynchSimple.setLoggingTag(loggingTag);
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// Engagable
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public void engage() {
-		// The engagement lock is distinct from the concurrentClientLock because we need to be
-		// able to drain heartbeats while disarming, so can't own the concurrentClientLock then,
-		// but we still need to be able to lock out engage() and disengage() against each other.
-		// Locking order: armingLock > concurrentClientLock > callbackLock
-		//
-		synchronized (engagementLock) {
-			isEngaged = true;
-			adjustHooking();
-		}
-	}
-
-	protected void hook() {
-		// engagementLock is distinct from the concurrentClientLock because we need to be
-		// able to drain heartbeats while disarming, so can't own the concurrentClientLock then,
-		// but we still need to be able to lock out engage() and disengage() against each other.
-		// Locking order: engagementLock > concurrentClientLock
-		//
-		synchronized (engagementLock) {
-			if (!isHooked) {
-				startHeartBeat();
-				isHooked = true;
-			}
-		}
-	}
-
-	/* adjust the hooking state to reflect the user's engagement intent */
-	protected void adjustHooking() {
-		synchronized (engagementLock) {
-			if (!isHooked && isEngaged)
-				hook();
-			else if (isHooked && !isEngaged) unhook();
-		}
-	}
-
-	@Override
-	public boolean isEngaged() {
-		return isEngaged;
-	}
-
-	@Override
-	public boolean isArmed() {
-		synchronized (engagementLock) {
-			if (isHooked) {
-				return i2cDeviceSynchSimple.isArmed();
-			}
-			return false;
-		}
-	}
-
-	@Override
-	public void disengage() {
-		synchronized (engagementLock) {
-			isEngaged = false;
-			adjustHooking();
-		}
-	}
-
-	protected void unhook() {
-		synchronized (engagementLock) {
-			if (isHooked) {
-				stopHeartBeat();
-				synchronized (concurrentClientLock) {
-					waitForWriteCompletions();
-					isHooked = false;
-				}
-			}
-		}
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// Heartbeats
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public void setHeartbeatInterval(final int ms) {
-		synchronized (concurrentClientLock) {
-			msHeartbeatInterval = Math.max(0, msHeartbeatInterval);
-			stopHeartBeat();
-			startHeartBeat();
-		}
-	}
-
-	@Override
-	public int getHeartbeatInterval() {
-		return msHeartbeatInterval;
-	}
-
-	@Override
-	public void setHeartbeatAction(final HeartbeatAction action) {
-		heartbeatAction = action;
-	}
-
-	@Override
-	public HeartbeatAction getHeartbeatAction() {
-		return heartbeatAction;
-	}
-
-	void startHeartBeat() {
-		if (msHeartbeatInterval > 0) {
-			heartbeatExecutor = ThreadPool.newSingleThreadScheduledExecutor();
-			heartbeatExecutor.scheduleAtFixedRate(() -> {
-				final HeartbeatAction action = getHeartbeatAction();
-				if (action != null) {
-					synchronized (concurrentClientLock) {
-						if (action.rereadLastRead && cregReadLast != 0) {
-							read(iregReadLast, cregReadLast);
-							return;
-						}
-						if (action.rewriteLastWritten && rgbWriteLast != null) {
-							write(iregWriteLast, rgbWriteLast);
-							return;
-						}
-						if (action.heartbeatReadWindow != null) {
-							read(action.heartbeatReadWindow.getRegisterFirst(), action.heartbeatReadWindow.getRegisterCount());
-						}
-					}
-				}
-			}, 0, msHeartbeatInterval, TimeUnit.MILLISECONDS);
-		}
-	}
-
-	void stopHeartBeat() {
-		if (heartbeatExecutor != null) {
-			heartbeatExecutor.shutdownNow();
-			ThreadPool.awaitTerminationOrExitApplication(heartbeatExecutor, 2, TimeUnit.SECONDS, "heartbeat executor", "internal error");
-			heartbeatExecutor = null;
-		}
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// Read window
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public void setReadWindow(final ReadWindow window) {
-		synchronized (concurrentClientLock) {
-			readWindow = window.readableCopy();
-		}
-	}
-
-	@Override
-	public ReadWindow getReadWindow() {
-		synchronized (concurrentClientLock) {
-			return readWindow;
-		}
-	}
-
-	@Override
-	public void ensureReadWindow(final ReadWindow windowNeeded, final ReadWindow windowToSet) {
-		synchronized (concurrentClientLock) {
-			if (readWindow == null || !readWindow.containsWithSameMode(windowNeeded)) {
-				setReadWindow(windowToSet);
-			}
-		}
-	}
-
-	@Override
-	public TimestampedData readTimeStamped(final int ireg, final int creg, final ReadWindow readWindowNeeded, final ReadWindow readWindowSet) {
-		ensureReadWindow(readWindowNeeded, readWindowSet);
-		return readTimeStamped(ireg, creg);
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// HardwareDevice
-	// ----------------------------------------------------------------------------------------------
-
-	@Override
-	public Manufacturer getManufacturer() {
-		return i2cDeviceSynchSimple.getManufacturer();
-	}
-
-	@Override
-	public String getDeviceName() {
-		return i2cDeviceSynchSimple.getDeviceName();
-	}
-
-	@Override
-	public String getConnectionInfo() {
-		return i2cDeviceSynchSimple.getConnectionInfo();
-	}
-
-	@Override
-	public int getVersion() {
-		return i2cDeviceSynchSimple.getVersion();
-	}
-
-	@Override
-	public void resetDeviceConfigurationForOpMode() {
-		i2cDeviceSynchSimple.resetDeviceConfigurationForOpMode();
-		readWindow = null;
-		// TODO: more to come
-	}
-
-	@Override
-	public void close() {
-		isClosing = true;
-		disengage();
-		if (isSimpleOwned) {
-			i2cDeviceSynchSimple.close();
-		}
-	}
-
-	// ----------------------------------------------------------------------------------------------
-	// I2cDeviceSynch pass through
-	// ----------------------------------------------------------------------------------------------
-
-	protected boolean isOpenForReading() {
-		return isHooked && newReadsAndWritesAllowed();
-	}
-
-	protected boolean isOpenForWriting() {
-		return isHooked && newReadsAndWritesAllowed();
-	}
-
-	protected boolean newReadsAndWritesAllowed() {
-		return !isClosing;
-	}
-
-	@Override
-	public void setI2cAddress(final I2cAddr newAddress) {
-		setI2cAddr(newAddress);
-	}
-
-	@Override
-	public I2cAddr getI2cAddress() {
-		return getI2cAddr();
-	}
-
-	@Override
-	public void setI2cAddr(final I2cAddr i2cAddr) {
-		i2cDeviceSynchSimple.setI2cAddr(i2cAddr);
-	}
-
-	@Override
-	public I2cAddr getI2cAddr() {
-		return i2cDeviceSynchSimple.getI2cAddr();
-	}
-
-	@Override
-	public synchronized byte read8(final int ireg) {
-		return read(ireg, 1)[0];
-	}
-
-	@Override
-	public byte[] read(final int ireg, final int creg) {
-		return readTimeStamped(ireg, creg).data;
-	}
-
-	@Override
-	public TimestampedData readTimeStamped(final int ireg, final int creg) {
-		synchronized (concurrentClientLock) {
-			if (!isOpenForReading()) return I2cDeviceSynchImpl.makeFakeData(ireg, creg);
-
-			iregReadLast = ireg;
-			cregReadLast = creg;
-			if (readWindow != null && readWindow.contains(ireg, creg)) {
-				final TimestampedData windowedData = i2cDeviceSynchSimple.readTimeStamped(readWindow.getRegisterFirst(), readWindow.getRegisterCount());
-				final int ibFirst = ireg - readWindow.getRegisterFirst();
-				final TimestampedData result = new TimestampedData();
-				result.data = Arrays.copyOfRange(windowedData.data, ibFirst, ibFirst + creg);
-				result.nanoTime = windowedData.nanoTime;
-				return result;
-			} else {
-				return i2cDeviceSynchSimple.readTimeStamped(ireg, creg);
-			}
-		}
-	}
-
-	@Override
-	public void write8(final int ireg, final int bVal) {
-		write8(ireg, bVal, false);
-	}
-
-	@Override
-	public void write8(final int ireg, final int bVal, final boolean waitForCompletion) {
-		write(ireg, new byte[] {(byte) bVal}, waitForCompletion);
-	}
-
-	@Override
-	public void write(final int ireg, final byte[] data) {
-		write(ireg, data, false);
-	}
-
-	@Override
-	public void write(final int ireg, final byte[] data, final boolean waitForCompletion) {
-		synchronized (concurrentClientLock) {
-			if (!isOpenForWriting()) return; // Ignore the write
-
-			iregWriteLast = ireg;
-			rgbWriteLast = Arrays.copyOf(data, data.length);
-			i2cDeviceSynchSimple.write(ireg, data, waitForCompletion);
-		}
-	}
-
-	@Override
-	public void waitForWriteCompletions() {
-		i2cDeviceSynchSimple.waitForWriteCompletions();
-	}
-
-	@Override
-	public void enableWriteCoalescing(final boolean enable) {
-		i2cDeviceSynchSimple.enableWriteCoalescing(enable);
-	}
-
-	@Override
-	public boolean isWriteCoalescingEnabled() {
-		return i2cDeviceSynchSimple.isWriteCoalescingEnabled();
-	}
-}
