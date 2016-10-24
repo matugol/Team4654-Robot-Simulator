@@ -36,27 +36,28 @@
 /*    */ 
 /*    */ 
 /*    */ 
-/*    */ public abstract class ColumnMajorMatrixF
+/*    */ public abstract class RowMajorMatrixF
 /*    */   extends DenseMatrixF
 /*    */ {
-/*    */   public ColumnMajorMatrixF(int nRows, int nCols)
+/*    */   public RowMajorMatrixF(int nRows, int nCols)
 /*    */   {
 /* 44 */     super(nRows, nCols);
 /*    */   }
 /*    */   
+/*    */ 
 /*    */   protected int indexFromRowCol(int row, int col)
 /*    */   {
-/* 49 */     return col * this.numRows + row;
+/* 50 */     return row * this.numCols + col;
 /*    */   }
 /*    */   
 /*    */   public VectorF toVector()
 /*    */   {
-/* 54 */     return new VectorF(getData());
+/* 55 */     return new VectorF(getData());
 /*    */   }
 /*    */ }
 
 
-/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\org\firstinspires\ftc\robotcore\external\matrices\ColumnMajorMatrixF.class
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\org\firstinspires\ftc\robotcore\external\matrices\RowMajorMatrixF.class
  * Java compiler version: 7 (51.0)
  * JD-Core Version:       0.7.1
  */

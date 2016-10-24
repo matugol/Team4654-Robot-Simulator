@@ -1,60 +1,68 @@
-/*
- * Copyright (c) 2016 Robert Atkinson
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- * 
- * Neither the name of Robert Atkinson nor the names of his contributors may be used to
- * endorse or promote products derived from this software without specific prior
- * written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESSFOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*    */ package org.firstinspires.ftc.robotcore.external.matrices;
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ public class ColumnMatrixF
+/*    */   extends MatrixF
+/*    */ {
+/*    */   VectorF vector;
+/*    */   
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */ 
+/*    */   public ColumnMatrixF(VectorF vector)
+/*    */   {
+/* 44 */     super(vector.length(), 1);
+/* 45 */     this.vector = vector;
+/*    */   }
+/*    */   
+/*    */   public float get(int row, int col)
+/*    */   {
+/* 50 */     return this.vector.get(row);
+/*    */   }
+/*    */   
+/*    */   public void put(int row, int col, float value)
+/*    */   {
+/* 55 */     this.vector.put(row, value);
+/*    */   }
+/*    */   
+/*    */   public MatrixF emptyMatrix(int numRows, int numCols)
+/*    */   {
+/* 60 */     return new GeneralMatrixF(numRows, numCols);
+/*    */   }
+/*    */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\org\firstinspires\ftc\robotcore\external\matrices\ColumnMatrixF.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-package org.firstinspires.ftc.robotcore.external.matrices;
-
-/**
- * A {@link ColumnMatrixF} is a matrix that converts a VectorF into a 1xn matrix
- */
-public class ColumnMatrixF extends MatrixF {
-	VectorF vector;
-
-	public ColumnMatrixF(final VectorF vector) {
-		super(vector.length(), 1);
-		this.vector = vector;
-	}
-
-	@Override
-	public float get(final int row, final int col) {
-		return vector.get(row);
-	}
-
-	@Override
-	public void put(final int row, final int col, final float value) {
-		vector.put(row, value);
-	}
-
-	@Override
-	public MatrixF emptyMatrix(final int numRows, final int numCols) {
-		return new GeneralMatrixF(numRows, numCols);
-	}
-}
