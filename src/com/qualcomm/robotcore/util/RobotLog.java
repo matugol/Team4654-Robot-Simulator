@@ -1,485 +1,452 @@
-/*
- * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification, are permitted
- * (subject to the limitations in the disclaimer below) provided that the following conditions are
- * met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list of conditions
- * and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this list of conditions
- * and the following disclaimer in the documentation and/or other materials provided with the
- * distribution.
- * 
- * Neither the name of Qualcomm Technologies Inc nor the names of its contributors may be used to
- * endorse or promote products derived from this software without specific prior written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
- * SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
- * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.util;
+/*     */ 
+/*     */ import android.content.Context;
+/*     */ import android.os.Environment;
+/*     */ import android.util.Log;
+/*     */ import com.qualcomm.robotcore.exception.RobotCoreException;
+/*     */ import com.qualcomm.robotcore.robocol.Heartbeat;
+/*     */ import java.io.File;
+/*     */ import java.util.GregorianCalendar;
+/*     */ import java.util.WeakHashMap;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class RobotLog
+/*     */ {
+/*  63 */   private static String globalErrorMessage = "";
+/*  64 */   private static final Object globalWarningLock = new Object();
+/*  65 */   private static String globalWarningMessage = "";
+/*  66 */   private static WeakHashMap<GlobalWarningSource, Integer> globalWarningSources = new WeakHashMap();
+/*  67 */   private static double msTimeOffset = 0.0D;
+/*     */   
+/*     */   public static final String TAG = "RobotCore";
+/*     */   
+/*  71 */   private static boolean writeLogcatToDiskEnabled = false;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void processTimeSynch(long t0, long t1, long t2, long t3)
+/*     */   {
+/*  83 */     if ((t0 == 0L) || (t1 == 0L) || (t2 == 0L) || (t3 == 0L)) {
+/*  84 */       return;
+/*     */     }
+/*     */     
+/*     */ 
+/*  88 */     double offset = (t1 - t0 + (t2 - t3)) / 2.0D;
+/*  89 */     setMsTimeOffset(offset);
+/*     */   }
+/*     */   
+/*     */   public static void setMsTimeOffset(double offset)
+/*     */   {
+/*  94 */     msTimeOffset = offset;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/* 101 */   public static void a(String format, Object... args) { v(String.format(format, args)); }
+/*     */   
+/* 103 */   public static void a(String message) { internalLog(7, "RobotCore", message); }
+/*     */   
+/* 105 */   public static void aa(String tag, String format, Object... args) { vv(tag, String.format(format, args)); }
+/*     */   
+/* 107 */   public static void aa(String tag, String message) { internalLog(7, tag, message); }
+/*     */   
+/*     */ 
+/* 110 */   public static void v(String format, Object... args) { v(String.format(format, args)); }
+/*     */   
+/* 112 */   public static void v(String message) { internalLog(2, "RobotCore", message); }
+/*     */   
+/* 114 */   public static void vv(String tag, String format, Object... args) { vv(tag, String.format(format, args)); }
+/*     */   
+/* 116 */   public static void vv(String tag, String message) { internalLog(2, tag, message); }
+/*     */   
+/*     */ 
+/* 119 */   public static void d(String format, Object... args) { d(String.format(format, args)); }
+/*     */   
+/* 121 */   public static void d(String message) { internalLog(3, "RobotCore", message); }
+/*     */   
+/* 123 */   public static void dd(String tag, String format, Object... args) { dd(tag, String.format(format, args)); }
+/*     */   
+/* 125 */   public static void dd(String tag, String message) { internalLog(3, tag, message); }
+/*     */   
+/*     */ 
+/* 128 */   public static void i(String format, Object... args) { i(String.format(format, args)); }
+/*     */   
+/* 130 */   public static void i(String message) { internalLog(4, "RobotCore", message); }
+/*     */   
+/* 132 */   public static void ii(String tag, String format, Object... args) { ii(tag, String.format(format, args)); }
+/*     */   
+/* 134 */   public static void ii(String tag, String message) { internalLog(4, tag, message); }
+/*     */   
+/*     */ 
+/* 137 */   public static void w(String format, Object... args) { w(String.format(format, args)); }
+/*     */   
+/* 139 */   public static void w(String message) { internalLog(5, "RobotCore", message); }
+/*     */   
+/* 141 */   public static void ww(String tag, String format, Object... args) { ww(tag, String.format(format, args)); }
+/*     */   
+/* 143 */   public static void ww(String tag, String message) { internalLog(5, tag, message); }
+/*     */   
+/*     */ 
+/* 146 */   public static void e(String format, Object... args) { e(String.format(format, args)); }
+/*     */   
+/* 148 */   public static void e(String message) { internalLog(6, "RobotCore", message); }
+/*     */   
+/* 150 */   public static void ee(String tag, String format, Object... args) { ee(tag, String.format(format, args)); }
+/*     */   
+/* 152 */   public static void ee(String tag, String message) { internalLog(6, tag, message); }
+/*     */   
+/*     */   private static void internalLog(int priority, String tag, String message)
+/*     */   {
+/* 156 */     if (msTimeOffset == 0.0D) {
+/* 157 */       Log.println(priority, tag, message);
+/*     */     } else {
+/* 159 */       double offset = msTimeOffset;
+/* 160 */       long now = (Heartbeat.getMsTimeSyncTime() + offset + 0.5D);
+/* 161 */       GregorianCalendar tNow = new GregorianCalendar();tNow.setTimeInMillis(now);
+/* 162 */       Log.println(priority, tag, String.format("dms=%d s=%d.%03d %s", new Object[] { Integer.valueOf((int)(msTimeOffset + 0.5D)), Integer.valueOf(tNow.get(13)), Integer.valueOf(tNow.get(14)), message }));
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public static void logStacktrace(Thread thread, String format, Object... args) {
+/* 167 */     String message = String.format(format, args);
+/* 168 */     e("thread id=%d name=\"%s\" %s", new Object[] { Long.valueOf(thread.getId()), thread.getName(), message });
+/* 169 */     for (StackTraceElement el : thread.getStackTrace()) {
+/* 170 */       e("    at %s", new Object[] { el.toString() });
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public static void logStacktrace(Exception e) {
+/* 175 */     e(e.toString());
+/* 176 */     for (StackTraceElement el : e.getStackTrace()) {
+/* 177 */       e(el.toString());
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public static void logStacktrace(RobotCoreException e) {
+/* 182 */     e(e.toString());
+/* 183 */     for (StackTraceElement el : e.getStackTrace()) {
+/* 184 */       e(el.toString());
+/*     */     }
+/*     */     
+/* 187 */     if (e.isChainedException()) {
+/* 188 */       e("Exception chained from:");
+/* 189 */       if ((e.getChainedException() instanceof RobotCoreException)) {
+/* 190 */         logStacktrace((RobotCoreException)e.getChainedException());
+/*     */       } else {
+/* 192 */         logStacktrace(e.getChainedException());
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public static void logAndThrow(String errMsg) throws RobotCoreException {
+/* 198 */     w(errMsg);
+/* 199 */     throw new RobotCoreException(errMsg);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static boolean setGlobalErrorMsg(String message)
+/*     */   {
+/* 222 */     if (globalErrorMessage.isEmpty()) {
+/* 223 */       globalErrorMessage += message;
+/* 224 */       return true;
+/*     */     }
+/* 226 */     return false;
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalErrorMsg(String format, Object... args) {
+/* 230 */     setGlobalErrorMsg(String.format(format, args));
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void setGlobalWarningMessage(String message)
+/*     */   {
+/* 242 */     synchronized (globalWarningLock) {
+/* 243 */       if (globalWarningMessage.isEmpty()) {
+/* 244 */         globalWarningMessage += message;
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalWarningMessage(String format, Object... args) {
+/* 250 */     setGlobalWarningMessage(String.format(format, args));
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void registerGlobalWarningSource(GlobalWarningSource globalWarningSource)
+/*     */   {
+/* 265 */     synchronized (globalWarningLock) {
+/* 266 */       globalWarningSources.put(globalWarningSource, Integer.valueOf(1));
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void unregisterGlobalWarningSource(GlobalWarningSource globalWarningSource)
+/*     */   {
+/* 282 */     synchronized (globalWarningLock) {
+/* 283 */       globalWarningSources.remove(globalWarningSource);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalWarningMsg(RobotCoreException e, String message) {
+/* 288 */     setGlobalWarningMessage(message + ": " + e.getMessage());
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalErrorMsg(RobotCoreException e, String message) {
+/* 292 */     setGlobalErrorMsg(message + ": " + e.getMessage());
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalErrorMsgAndThrow(RobotCoreException e, String message) throws RobotCoreException {
+/* 296 */     setGlobalErrorMsg(e, message);
+/* 297 */     throw e;
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalErrorMsg(RuntimeException e, String message) {
+/* 301 */     setGlobalErrorMsg(String.format("%s: %s: %s", new Object[] { message, e.getClass().getSimpleName(), e.getMessage() }));
+/*     */   }
+/*     */   
+/*     */   public static void setGlobalErrorMsgAndThrow(RuntimeException e, String message) throws RobotCoreException {
+/* 305 */     setGlobalErrorMsg(e, message);
+/* 306 */     throw e;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static String getGlobalErrorMsg()
+/*     */   {
+/* 314 */     return globalErrorMessage;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static String getGlobalWarningMessage()
+/*     */   {
+/* 323 */     StringBuilder result = new StringBuilder();
+/*     */     
+/* 325 */     synchronized (globalWarningLock) {
+/* 326 */       if (!globalWarningMessage.isEmpty()) {
+/* 327 */         result.append(globalWarningMessage);
+/*     */       }
+/* 329 */       for (GlobalWarningSource source : globalWarningSources.keySet()) {
+/* 330 */         String warning = source.getGlobalWarning();
+/* 331 */         if ((warning != null) && (!warning.isEmpty())) {
+/* 332 */           if (result.length() > 0)
+/* 333 */             result.append("; ");
+/* 334 */           result.append(warning);
+/*     */         }
+/*     */       }
+/*     */     }
+/*     */     
+/* 339 */     return result.toString();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static boolean hasGlobalErrorMsg()
+/*     */   {
+/* 347 */     return !getGlobalErrorMsg().isEmpty();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static boolean hasGlobalWarningMsg()
+/*     */   {
+/* 355 */     return !getGlobalWarningMessage().isEmpty();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public static void clearGlobalErrorMsg()
+/*     */   {
+/* 362 */     globalErrorMessage = "";
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public static void clearGlobalWarningMsg()
+/*     */   {
+/* 369 */     synchronized (globalWarningLock) {
+/* 370 */       globalWarningMessage = "";
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void writeLogcatToDisk(Context context, final int fileSizeKb)
+/*     */   {
+/* 385 */     if (writeLogcatToDiskEnabled) return;
+/* 386 */     writeLogcatToDiskEnabled = true;
+/*     */     
+/* 388 */     final String packageName = context.getPackageName();
+/* 389 */     final String filename = new File(getLogFilename(context)).getAbsolutePath();
+/*     */     
+/* 391 */     Thread logThread = new Thread("Logging Thread")
+/*     */     {
+/*     */       public void run()
+/*     */       {
+/*     */         try {
+/* 396 */           String filter = "UsbRequestJNI:S UsbRequest:S *:V";
+/* 397 */           int maxRotatedLogs = 1;
+/*     */           
+/* 399 */           RobotLog.v("saving logcat to " + filename);
+/* 400 */           RunShellCommand shell = new RunShellCommand();
+/* 401 */           RunShellCommand.killSpawnedProcess("logcat", packageName, shell);
+/* 402 */           shell.run(String.format("logcat -f %s -r%d -n%d -v time %s", new Object[] { filename, Integer.valueOf(fileSizeKb), Integer.valueOf(1), "UsbRequestJNI:S UsbRequest:S *:V" }));
+/*     */         }
+/*     */         catch (RobotCoreException e) {
+/* 405 */           RobotLog.v("Error while writing log file to disk: " + e.toString());
+/*     */         } finally {
+/* 407 */           RobotLog.access$002(false);
+/*     */         }
+/*     */       }
+/* 410 */     };
+/* 411 */     logThread.start();
+/*     */   }
+/*     */   
+/*     */   public static String getLogFilename(Context context) {
+/* 415 */     String filename = Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + context.getPackageName();
+/* 416 */     return filename + ".logcat";
+/*     */   }
+/*     */   
+/*     */   public static void cancelWriteLogcatToDisk(Context context) {
+/* 420 */     final String packageName = context.getPackageName();
+/* 421 */     String filename = new File(Environment.getExternalStorageDirectory(), packageName).getAbsolutePath();
+/*     */     
+/* 423 */     writeLogcatToDiskEnabled = false;
+/*     */     
+/* 425 */     Thread logThread = new Thread()
+/*     */     {
+/*     */       public void run()
+/*     */       {
+/*     */         try {
+/* 430 */           Thread.sleep(1000L);
+/*     */         }
+/*     */         catch (InterruptedException localInterruptedException) {}
+/*     */         
+/*     */         try
+/*     */         {
+/* 436 */           RobotLog.v("closing logcat file " + this.val$filename);
+/* 437 */           RunShellCommand shell = new RunShellCommand();
+/* 438 */           RunShellCommand.killSpawnedProcess("logcat", packageName, shell);
+/*     */         } catch (RobotCoreException e) {
+/* 440 */           RobotLog.v("Unable to cancel writing log file to disk: " + e.toString());
+/*     */         }
+/*     */       }
+/* 443 */     };
+/* 444 */     logThread.start();
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\util\RobotLog.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.util;
-
-import java.io.File;
-import java.util.GregorianCalendar;
-import java.util.WeakHashMap;
-
-import org.omg.CORBA.Environment;
-
-/**
- * Allows consistent logging across all RobotCore packages
- */
-public class RobotLog {
-
-	/*
-	 * Currently only supports android style logging, but may support more in the future.
-	 */
-
-	/*
-	 * Only contains static utility methods
-	 */
-	private RobotLog() {}
-
-	// ------------------------------------------------------------------------------------------------
-	// State
-	// ------------------------------------------------------------------------------------------------
-
-	private static String globalErrorMessage = "";
-	private static final Object globalWarningLock = new Object();
-	private static String globalWarningMessage = "";
-	private static WeakHashMap<GlobalWarningSource, Integer> globalWarningSources = new WeakHashMap<GlobalWarningSource, Integer>();
-	private static double msTimeOffset = 0.0;
-
-	public static final String TAG = "RobotCore";
-
-	private static boolean writeLogcatToDiskEnabled = false;
-
-	// ------------------------------------------------------------------------------------------------
-	// Time Synchronization
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Processes the reception of a set of NTP timestamps between this device (t0 and t3) and
-	 * a remote device (t1 and t2) with whom it is trying to synchronize time. Our current implementation
-	 * is very, very crude: we just calculate the instantaneous offset, and remember. But that's probably
-	 * good enough for trying to coordinate timestamps in logs.
-	 */
-	public static void processTimeSynch(final long t0, final long t1, final long t2, final long t3) {
-		if (t0 == 0 || t1 == 0 || t2 == 0 || t3 == 0) return; // invalid packet data
-
-		// https://en.wikipedia.org/wiki/Network_Time_Protocol
-		// offset is how much the time source is ahead of us (ie: not behind)
-		final double offset = (t1 - t0 + t2 - t3) / 2.0;
-		setMsTimeOffset(offset);
-	}
-
-	// Records the time difference between this device and a device with whom we are synchronizing our time
-	public static void setMsTimeOffset(final double offset) {
-		msTimeOffset = offset;
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Logging API
-	// ------------------------------------------------------------------------------------------------
-
-	public static void a(final String format, final Object... args) {
-		v(String.format(format, args));
-	}
-
-	public static void a(final String message) {
-		internalLog(Log.ASSERT, TAG, message);
-	}
-
-	public static void aa(final String tag, final String format, final Object... args) {
-		vv(tag, String.format(format, args));
-	}
-
-	public static void aa(final String tag, final String message) {
-		internalLog(Log.ASSERT, tag, message);
-	}
-
-	public static void v(final String format, final Object... args) {
-		v(String.format(format, args));
-	}
-
-	public static void v(final String message) {
-		internalLog(Log.VERBOSE, TAG, message);
-	}
-
-	public static void vv(final String tag, final String format, final Object... args) {
-		vv(tag, String.format(format, args));
-	}
-
-	public static void vv(final String tag, final String message) {
-		internalLog(Log.VERBOSE, tag, message);
-	}
-
-	public static void d(final String format, final Object... args) {
-		d(String.format(format, args));
-	}
-
-	public static void d(final String message) {
-		internalLog(Log.DEBUG, TAG, message);
-	}
-
-	public static void dd(final String tag, final String format, final Object... args) {
-		dd(tag, String.format(format, args));
-	}
-
-	public static void dd(final String tag, final String message) {
-		internalLog(Log.DEBUG, tag, message);
-	}
-
-	public static void i(final String format, final Object... args) {
-		i(String.format(format, args));
-	}
-
-	public static void i(final String message) {
-		internalLog(Log.INFO, TAG, message);
-	}
-
-	public static void ii(final String tag, final String format, final Object... args) {
-		ii(tag, String.format(format, args));
-	}
-
-	public static void ii(final String tag, final String message) {
-		internalLog(Log.INFO, tag, message);
-	}
-
-	public static void w(final String format, final Object... args) {
-		w(String.format(format, args));
-	}
-
-	public static void w(final String message) {
-		internalLog(Log.WARN, TAG, message);
-	}
-
-	public static void ww(final String tag, final String format, final Object... args) {
-		ww(tag, String.format(format, args));
-	}
-
-	public static void ww(final String tag, final String message) {
-		internalLog(Log.WARN, tag, message);
-	}
-
-	public static void e(final String format, final Object... args) {
-		e(String.format(format, args));
-	}
-
-	public static void e(final String message) {
-		internalLog(Log.ERROR, TAG, message);
-	}
-
-	public static void ee(final String tag, final String format, final Object... args) {
-		ee(tag, String.format(format, args));
-	}
-
-	public static void ee(final String tag, final String message) {
-		internalLog(Log.ERROR, tag, message);
-	}
-
-	private static void internalLog(final int priority, final String tag, final String message) {
-		if (msTimeOffset == 0) {
-			android.util.Log.println(priority, tag, message);
-		} else {
-			final double offset = msTimeOffset;
-			final long now = (long) (Heartbeat.getMsTimeSyncTime() + offset + 0.5);
-			final GregorianCalendar tNow = new GregorianCalendar();
-			tNow.setTimeInMillis(now);
-			android.util.Log.println(priority, tag, String.format("dms=%d s=%d.%03d %s", (int) (msTimeOffset + 0.5), tNow.get(GregorianCalendar.SECOND), tNow.get(GregorianCalendar.MILLISECOND), message));
-		}
-	}
-
-	public static void logStacktrace(final Thread thread, final String format, final Object... args) {
-		final String message = String.format(format, args);
-		RobotLog.e("thread id=%d name=\"%s\" %s", thread.getId(), thread.getName(), message);
-		for (final StackTraceElement el : thread.getStackTrace()) {
-			RobotLog.e("    at %s", el.toString());
-		}
-	}
-
-	public static void logStacktrace(final Exception e) {
-		RobotLog.e(e.toString());
-		for (final StackTraceElement el : e.getStackTrace()) {
-			RobotLog.e(el.toString());
-		}
-	}
-
-	public static void logStacktrace(final RobotCoreException e) {
-		RobotLog.e(e.toString());
-		for (final StackTraceElement el : e.getStackTrace()) {
-			RobotLog.e(el.toString());
-		}
-
-		if (e.isChainedException()) {
-			RobotLog.e("Exception chained from:");
-			if (e.getChainedException() instanceof RobotCoreException) {
-				logStacktrace((RobotCoreException) e.getChainedException());
-			} else {
-				logStacktrace(e.getChainedException());
-			}
-		}
-	}
-
-	public static void logAndThrow(final String errMsg) throws RobotCoreException {
-		w(errMsg);
-		throw new RobotCoreException(errMsg);
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Error and Warning Messages
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Set a global error message
-	 *
-	 * This message stays set until clearGlobalErrorMsg is called. Additional
-	 * calls to set the global error message will be silently ignored until the
-	 * current error message is cleared.
-	 *
-	 * This is so that if multiple global error messages are raised, the first
-	 * error message is captured.
-	 *
-	 * Presently, the global error is cleared only when the robot is restarted.
-	 *
-	 * @param message error message
-	 */
-	public static boolean setGlobalErrorMsg(final String message) {
-		// don't allow a new error message to overwrite the old error message
-		if (globalErrorMessage.isEmpty()) {
-			globalErrorMessage += message; // using += to force a null pointer exception if message is null
-			return true;
-		}
-		return false;
-	}
-
-	public static void setGlobalErrorMsg(final String format, final Object... args) {
-		setGlobalErrorMsg(String.format(format, args));
-	}
-
-	/**
-	 * Sets the global warning message.
-	 *
-	 * This stays set until clearGlobalWarningMsg is called.
-	 *
-	 * @param message the warning message to set
-	 */
-	public static void setGlobalWarningMessage(final String message) {
-		synchronized (globalWarningLock) {
-			if (globalWarningMessage.isEmpty()) {
-				globalWarningMessage += message;
-			}
-		}
-	}
-
-	public static void setGlobalWarningMessage(final String format, final Object... args) {
-		setGlobalWarningMessage(String.format(format, args));
-	}
-
-	/**
-	 * Adds (if not already present) a new source that can contribute the generation of warnings
-	 * on the robot controller and driver station displays (if the source is already registered,
-	 * the call has no effect). The source will periodically be polled for its contribution to
-	 * the overall warning message; if the source has no warning to contribute, it should return
-	 * an empty string. Note that weak references are used in this registration: the act of adding
-	 * a global warning source will not of its own accord keep that source from being reclaimed by
-	 * the system garbage collector.
-	 *
-	 * @param globalWarningSource the warning source to add
-	 */
-	public static void registerGlobalWarningSource(final GlobalWarningSource globalWarningSource) {
-		synchronized (globalWarningLock) {
-			globalWarningSources.put(globalWarningSource, 1);
-		}
-	}
-
-	/**
-	 * Removes (if present) a source from the list of warning sources contributing to the
-	 * overall system warning message (if the indicated source is not currently registered, this
-	 * call has no effect). Note that explicit unregistration of a warning source is not required:
-	 * due to the internal use of weak references, warning sources will be automatically
-	 * unregistered if they are reclaimed by the garbage collector. However, explicit unregistration
-	 * may be useful to the source itself so that it will stop being polled for its warning
-	 * contribution.
-	 *
-	 * @param globalWarningSource the source to remove as a global warning source
-	 */
-	public static void unregisterGlobalWarningSource(final GlobalWarningSource globalWarningSource) {
-		synchronized (globalWarningLock) {
-			globalWarningSources.remove(globalWarningSource);
-		}
-	}
-
-	public static void setGlobalWarningMsg(final RobotCoreException e, final String message) {
-		setGlobalWarningMessage(message + ": " + e.getMessage());
-	}
-
-	public static void setGlobalErrorMsg(final RobotCoreException e, final String message) {
-		setGlobalErrorMsg(message + ": " + e.getMessage());
-	}
-
-	public static void setGlobalErrorMsgAndThrow(final RobotCoreException e, final String message) throws RobotCoreException {
-		setGlobalErrorMsg(e, message);
-		throw e;
-	}
-
-	public static void setGlobalErrorMsg(final RuntimeException e, final String message) {
-		setGlobalErrorMsg(String.format("%s: %s: %s", message, e.getClass().getSimpleName(), e.getMessage()));
-	}
-
-	public static void setGlobalErrorMsgAndThrow(final RuntimeException e, final String message) throws RobotCoreException {
-		setGlobalErrorMsg(e, message);
-		throw e;
-	}
-
-	/**
-	 * Get the current global error message
-	 * 
-	 * @return error message
-	 */
-	public static String getGlobalErrorMsg() {
-		return globalErrorMessage;
-	}
-
-	/**
-	 * Returns the current global warning, or "" if there is none
-	 * 
-	 * @return the current global warning
-	 */
-	public static String getGlobalWarningMessage() {
-
-		final StringBuilder result = new StringBuilder();
-
-		synchronized (globalWarningLock) {
-			if (!globalWarningMessage.isEmpty()) result.append(globalWarningMessage);
-
-			for (final GlobalWarningSource source : globalWarningSources.keySet()) {
-				final String warning = source.getGlobalWarning();
-				if (warning != null && !warning.isEmpty()) {
-					if (result.length() > 0) result.append("; ");
-					result.append(warning);
-				}
-			}
-		}
-
-		return result.toString();
-	}
-
-	/**
-	 * Returns true if a global error message is set
-	 * 
-	 * @return true if there is an error message
-	 */
-	public static boolean hasGlobalErrorMsg() {
-		return !getGlobalErrorMsg().isEmpty();
-	}
-
-	/**
-	 * Returns whether a global warning currently exists
-	 * 
-	 * @return whether a global warning currently exists
-	 */
-	public static boolean hasGlobalWarningMsg() {
-		return !getGlobalWarningMessage().isEmpty();
-	}
-
-	/**
-	 * Clears the current global error message.
-	 */
-	public static void clearGlobalErrorMsg() {
-		globalErrorMessage = "";
-	}
-
-	/**
-	 * Clears the current global warning message.
-	 */
-	public static void clearGlobalWarningMsg() {
-		synchronized (globalWarningLock) {
-			globalWarningMessage = "";
-		}
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Disk Management
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Write logcat logs to disk. This method will continue writing logcat files for as long as the
-	 * program runs. Additional calls to this method will be a NOOP.
-	 *
-	 * @param context this app's context
-	 */
-	public static void writeLogcatToDisk(final Context context, final int fileSizeKb) {
-		if (writeLogcatToDiskEnabled) {
-			return;
-		}
-		writeLogcatToDiskEnabled = true;
-
-		final String packageName = context.getPackageName();
-		final String filename = new File(getLogFilename(context)).getAbsolutePath();
-
-		final Thread logThread = new Thread("Logging Thread") {
-			@Override
-			public void run() {
-				try {
-
-					final String filter = "UsbRequestJNI:S UsbRequest:S *:V";
-					final int maxRotatedLogs = 1;
-
-					RobotLog.v("saving logcat to " + filename);
-					final RunShellCommand shell = new RunShellCommand();
-					RunShellCommand.killSpawnedProcess("logcat", packageName, shell);
-					shell.run(String.format("logcat -f %s -r%d -n%d -v time %s", filename, fileSizeKb, maxRotatedLogs, filter));
-				} catch (final RobotCoreException e) {
-					RobotLog.v("Error while writing log file to disk: " + e.toString());
-				} finally {
-					writeLogcatToDiskEnabled = false;
-				}
-			}
-		};
-		logThread.start();
-	}
-
-	public static String getLogFilename(final Context context) {
-		final String filename = Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + context.getPackageName();
-		return filename + ".logcat";
-	}
-
-	public static void cancelWriteLogcatToDisk(final Context context) {
-		final String packageName = context.getPackageName();
-		final String filename = new File(Environment.getExternalStorageDirectory(), packageName).getAbsolutePath();
-
-		writeLogcatToDiskEnabled = false;
-
-		final Thread logThread = new Thread() {
-			@Override
-			public void run() {
-				try {
-					// let last few log messages out before we stop logging
-					Thread.sleep(1000);
-				} catch (final InterruptedException e) {
-					// just continue
-				}
-
-				try {
-					RobotLog.v("closing logcat file " + filename);
-					final RunShellCommand shell = new RunShellCommand();
-					RunShellCommand.killSpawnedProcess("logcat", packageName, shell);
-				} catch (final RobotCoreException e) {
-					RobotLog.v("Unable to cancel writing log file to disk: " + e.toString());
-				}
-			}
-		};
-		logThread.start();
-	}
-}

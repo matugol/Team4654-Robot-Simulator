@@ -1,233 +1,222 @@
-/*
- * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- * 
- * Neither the name of Qualcomm Technologies Inc nor the names of its contributors
- * may be used to endorse or promote products derived from this software without
- * specific prior written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.util;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class ElapsedTime
+/*     */ {
+/*     */   @Deprecated
+/*     */   public static final double dSECOND_IN_NANO = 1.0E9D;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   @Deprecated
+/*     */   public static final long lSECOND_IN_NANO = 1000000000L;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   @Deprecated
+/*     */   public static final double dMILLIS_IN_NANO = 1000000.0D;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   @Deprecated
+/*     */   public static final long lMILLIS_IN_NANO = 1000000L;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static final long SECOND_IN_NANO = 1000000000L;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static final long MILLIS_IN_NANO = 1000000L;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   private long startTime;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   private final double resolution;
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static enum Resolution
+/*     */   {
+/*  55 */     SECONDS, 
+/*  56 */     MILLISECONDS;
+/*     */     
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */     private Resolution() {}
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ElapsedTime()
+/*     */   {
+/*  87 */     reset();
+/*  88 */     this.resolution = 1.0E9D;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ElapsedTime(long startTime)
+/*     */   {
+/* 100 */     this.startTime = startTime;
+/* 101 */     this.resolution = 1.0E9D;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public ElapsedTime(Resolution resolution)
+/*     */   {
+/* 112 */     reset();
+/* 113 */     switch (resolution) {
+/*     */     case SECONDS: 
+/*     */     default: 
+/* 116 */       this.resolution = 1.0E9D;
+/* 117 */       break;
+/*     */     case MILLISECONDS: 
+/* 119 */       this.resolution = 1000000.0D;
+/*     */     }
+/*     */     
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void reset()
+/*     */   {
+/* 134 */     this.startTime = System.nanoTime();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public double startTime()
+/*     */   {
+/* 142 */     return this.startTime / this.resolution;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public double time()
+/*     */   {
+/* 156 */     return (System.nanoTime() - this.startTime) / this.resolution;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public double seconds()
+/*     */   {
+/* 165 */     return (System.nanoTime() - this.startTime) / 1.0E9D;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public double milliseconds()
+/*     */   {
+/* 174 */     return seconds() * 1000.0D;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public Resolution getResolution()
+/*     */   {
+/* 182 */     if (this.resolution == 1000000.0D) {
+/* 183 */       return Resolution.MILLISECONDS;
+/*     */     }
+/* 185 */     return Resolution.SECONDS;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   private String resolutionStr()
+/*     */   {
+/* 193 */     if (this.resolution == 1.0E9D)
+/* 194 */       return "seconds";
+/* 195 */     if (this.resolution == 1000000.0D) {
+/* 196 */       return "milliseconds";
+/*     */     }
+/* 198 */     return "Unknown units";
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void log(String label)
+/*     */   {
+/* 206 */     RobotLog.v(String.format("TIMER: %20s - %1.3f %s", new Object[] { label, Double.valueOf(time()), resolutionStr() }));
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public String toString()
+/*     */   {
+/* 214 */     return String.format("%1.4f %s", new Object[] { Double.valueOf(time()), resolutionStr() });
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\util\ElapsedTime.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.util;
-
-/**
- * The {@link ElapsedTime} class provides a simple handy timer to measure elapsed time intervals.
- * The timer does not provide events or callbacks, as some other timers do. Rather, at an application-
- * determined juncture, one can {@link #reset()} the timer. Thereafter, one can query the interval
- * of wall-clock time that has subsequently elapsed by calling the {@link #time()}, {@link #seconds()},
- * or {@link #milliseconds()} methods. The timer has nanosecond internal accuracy. The precision
- * reported by the {@link #time()} method is either seconds or milliseconds, depending on how the
- * timer is initially constructed. This class is not thread-safe.
- */
-public class ElapsedTime {
-
-	// ------------------------------------------------------------------------------------------------
-	// Types and constants
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * An indicator of the resolution of a timer.
-	 * 
-	 * @see ElapsedTime#ElapsedTime(Resolution)
-	 */
-	public enum Resolution {
-		SECONDS, MILLISECONDS
-	}
-
-	/** @deprecated use SECOND_IN_NANO instead */
-	@Deprecated
-	public static final double dSECOND_IN_NANO = 1000000000;
-	/** @deprecated use SECOND_IN_NANO instead */
-	@Deprecated
-	public static final long lSECOND_IN_NANO = 1000000000;
-	/** @deprecated use MILLIS_IN_NANO instead */
-	@Deprecated
-	public static final double dMILLIS_IN_NANO = 1000000;
-	/** @deprecated use MILLIS_IN_NANO instead */
-	@Deprecated
-	public static final long lMILLIS_IN_NANO = 1000000;
-
-	/** the number of nanoseconds in a second */
-	public static final long SECOND_IN_NANO = 1000000000;
-	/** the number of nanoseconds in a millisecond */
-	public static final long MILLIS_IN_NANO = 1000000;
-
-	// ------------------------------------------------------------------------------------------------
-	// State
-	// ------------------------------------------------------------------------------------------------
-
-	private long startTime;
-	private final double resolution;
-
-	// ------------------------------------------------------------------------------------------------
-	// Construction
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Creates a timer with resolution {@link com.qualcomm.robotcore.util.ElapsedTime.Resolution#SECONDS Resolution.Seconds}
-	 * that is initialized with the now-current time.
-	 * 
-	 * @see #ElapsedTime(long)
-	 * @see #ElapsedTime(Resolution)
-	 */
-	public ElapsedTime() {
-		reset();
-		resolution = SECOND_IN_NANO;
-	}
-
-	/**
-	 * Creates a timer with resolution {@link com.qualcomm.robotcore.util.ElapsedTime.Resolution#SECONDS Resolution.Seconds}.
-	 * The timer is initialized with the provided start time. Zero is often a useful value to provide
-	 * here: in common usage such timers will often be processed by application logic virtually immediately.
-	 *
-	 * @param startTime the initial value of the timer
-	 * @see #ElapsedTime()
-	 */
-	public ElapsedTime(final long startTime) {
-		this.startTime = startTime;
-		resolution = SECOND_IN_NANO;
-	}
-
-	/**
-	 * Creates a timer with a resolution of seconds or milliseconds. The resolution
-	 * affects the units in which the {@link #time()} method reports. The timer is initialized
-	 * with the current time.
-	 * 
-	 * @param resolution the resolution of the new timer
-	 * @see #ElapsedTime()
-	 */
-	public ElapsedTime(final Resolution resolution) {
-		reset();
-		switch (resolution) {
-			case SECONDS:
-			default:
-				this.resolution = SECOND_IN_NANO;
-				break;
-			case MILLISECONDS:
-				this.resolution = MILLIS_IN_NANO;
-				break;
-		}
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Operations
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * Resets the internal state of the timer to reflect the current time. Instantaneously following
-	 * this reset, {@link #time()} will report as zero.
-	 * 
-	 * @see #time()
-	 */
-	public void reset() {
-		startTime = System.nanoTime();
-	}
-
-	/**
-	 * Returns, in resolution-dependent units, the time at which this timer was last reset.
-	 * 
-	 * @return the reset time of the timer
-	 */
-	public double startTime() {
-		return startTime / resolution;
-	}
-
-	/**
-	 * Returns the duration that has elapsed since the last reset of this timer.
-	 * Units used are either seconds or milliseconds, depending on the resolution with
-	 * which the timer was instantiated.
-	 * 
-	 * @return time duration since last timer reset
-	 * @see #ElapsedTime()
-	 * @see #ElapsedTime(Resolution)
-	 * @see #seconds()
-	 * @see #milliseconds()
-	 */
-	public double time() {
-		return (System.nanoTime() - startTime) / resolution;
-	}
-
-	/**
-	 * Returns the same data as does {@link #time()}, but always in units of seconds
-	 * 
-	 * @return time duration since last timer reset
-	 * @see #time()
-	 */
-	public double seconds() {
-		return (System.nanoTime() - startTime) / (double) SECOND_IN_NANO;
-	}
-
-	/**
-	 * Returns the same data as does {@link #time()}, but always in millisecond units
-	 * 
-	 * @return time duration since last timer reset
-	 * @see #time()
-	 */
-	public double milliseconds() {
-		return seconds() * 1000;
-	}
-
-	/**
-	 * Returns the resolution with which the timer was instantiated.
-	 * 
-	 * @return the resolution of the timer
-	 */
-	public Resolution getResolution() {
-		if (resolution == MILLIS_IN_NANO)
-			return Resolution.MILLISECONDS;
-		else
-			return Resolution.SECONDS;
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Utility
-	// ------------------------------------------------------------------------------------------------
-
-	private String resolutionStr() {
-		if (resolution == SECOND_IN_NANO) {
-			return "seconds";
-		} else if (resolution == MILLIS_IN_NANO) {
-			return "milliseconds";
-		} else {
-			return "Unknown units";
-		}
-	}
-
-	/**
-	 * Log a message stating how long the timer has been running
-	 */
-	public void log(final String label) {
-		RobotLog.v(String.format("TIMER: %20s - %1.3f %s", label, time(), resolutionStr()));
-	}
-
-	/**
-	 * Returns a string indicating the current elapsed time of the timer.
-	 */
-	@Override
-	public String toString() {
-		return String.format("%1.4f %s", time(), resolutionStr());
-	}
-}

@@ -1,713 +1,752 @@
-/*
- * Copyright (c) 2014, 2015 Qualcomm Technologies Inc
- * 
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided that
- * the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list
- * of conditions and the following disclaimer.
- * 
- * Redistributions in binary form must reproduce the above copyright notice, this
- * list of conditions and the following disclaimer in the documentation and/or
- * other materials provided with the distribution.
- * 
- * Neither the name of Qualcomm Technologies Inc nor the names of its contributors
- * may be used to endorse or promote products derived from this software without
- * specific prior written permission.
- * 
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
- * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*     */ package com.qualcomm.robotcore.eventloop.opmode;
+/*     */ 
+/*     */ import android.app.Activity;
+/*     */ import android.content.Context;
+/*     */ import android.os.Debug;
+/*     */ import com.qualcomm.robotcore.R.string;
+/*     */ import com.qualcomm.robotcore.eventloop.EventLoop;
+/*     */ import com.qualcomm.robotcore.eventloop.EventLoopManager;
+/*     */ import com.qualcomm.robotcore.hardware.DcMotor;
+/*     */ import com.qualcomm.robotcore.hardware.DcMotor.RunMode;
+/*     */ import com.qualcomm.robotcore.hardware.DcMotorSimple;
+/*     */ import com.qualcomm.robotcore.hardware.Gamepad;
+/*     */ import com.qualcomm.robotcore.hardware.HardwareDevice;
+/*     */ import com.qualcomm.robotcore.hardware.HardwareMap;
+/*     */ import com.qualcomm.robotcore.hardware.LightSensor;
+/*     */ import com.qualcomm.robotcore.hardware.ServoController;
+/*     */ import com.qualcomm.robotcore.robocol.Command;
+/*     */ import com.qualcomm.robotcore.robocol.TelemetryMessage;
+/*     */ import com.qualcomm.robotcore.util.RobotLog;
+/*     */ import com.qualcomm.robotcore.util.ThreadPool;
+/*     */ import com.qualcomm.robotcore.util.WeakReferenceSet;
+/*     */ import java.util.LinkedHashMap;
+/*     */ import java.util.LinkedList;
+/*     */ import java.util.List;
+/*     */ import java.util.Map;
+/*     */ import java.util.Map.Entry;
+/*     */ import java.util.WeakHashMap;
+/*     */ import java.util.concurrent.CountDownLatch;
+/*     */ import java.util.concurrent.ExecutorService;
+/*     */ import java.util.concurrent.Semaphore;
+/*     */ import java.util.concurrent.TimeUnit;
+/*     */ import java.util.concurrent.atomic.AtomicReference;
+/*     */ import junit.framework.Assert;
+/*     */ import org.firstinspires.ftc.robotcore.external.Telemetry;
+/*     */ import org.firstinspires.ftc.robotcore.internal.AppUtil;
+/*     */ import org.firstinspires.ftc.robotcore.internal.network.NetworkConnectionHandler;
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ public class OpModeManagerImpl
+/*     */   implements OpModeServices, OpModeManager, OpModeManagerNotifier
+/*     */ {
+/*     */   public static final String DEFAULT_OP_MODE_NAME = "$Stop$Robot$";
+/*     */   
+/*     */   class OpModeStateTransition
+/*     */   {
+/*     */     OpModeStateTransition() {}
+/*     */     
+/*  85 */     String queuedOpModeName = null;
+/*  86 */     Boolean opModeSwapNeeded = null;
+/*  87 */     Boolean callToInitNeeded = null;
+/*  88 */     Boolean gamepadResetNeeded = null;
+/*  89 */     Boolean telemetryClearNeeded = null;
+/*  90 */     Boolean callToStartNeeded = null;
+/*     */     
+/*     */     void apply() {
+/*  93 */       if (this.queuedOpModeName != null) { OpModeManagerImpl.this.queuedOpModeName = this.queuedOpModeName;
+/*     */       }
+/*     */       
+/*  96 */       if (this.opModeSwapNeeded != null) OpModeManagerImpl.this.opModeSwapNeeded = this.opModeSwapNeeded.booleanValue();
+/*  97 */       if (this.callToInitNeeded != null) OpModeManagerImpl.this.callToInitNeeded = this.callToInitNeeded.booleanValue();
+/*  98 */       if (this.gamepadResetNeeded != null) OpModeManagerImpl.this.gamepadResetNeeded = this.gamepadResetNeeded.booleanValue();
+/*  99 */       if (this.telemetryClearNeeded != null) OpModeManagerImpl.this.telemetryClearNeeded = this.telemetryClearNeeded.booleanValue();
+/* 100 */       if (this.callToStartNeeded != null) OpModeManagerImpl.this.callToStartNeeded = this.callToStartNeeded.booleanValue();
+/*     */     }
+/*     */     
+/*     */     OpModeStateTransition copy() {
+/* 104 */       OpModeStateTransition result = new OpModeStateTransition(OpModeManagerImpl.this);
+/* 105 */       result.queuedOpModeName = this.queuedOpModeName;
+/* 106 */       result.opModeSwapNeeded = this.opModeSwapNeeded;
+/* 107 */       result.callToInitNeeded = this.callToInitNeeded;
+/* 108 */       result.gamepadResetNeeded = this.gamepadResetNeeded;
+/* 109 */       result.telemetryClearNeeded = this.telemetryClearNeeded;
+/* 110 */       result.callToStartNeeded = this.callToStartNeeded;
+/* 111 */       return result;
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/* 120 */   public static final OpMode DEFAULT_OP_MODE = new DefaultOpMode();
+/*     */   
+/* 122 */   protected static enum OpModeState { INIT,  LOOPING;
+/*     */     
+/*     */     private OpModeState() {} }
+/*     */   
+/*     */   protected static class OpModeObjectAndMeta { public final OpModeMeta meta;
+/* 127 */     public OpModeObjectAndMeta(OpModeMeta meta, OpMode opMode) { this.meta = meta;this.opMode = opMode; }
+/*     */     
+/*     */     public final OpMode opMode; }
+/*     */   
+/* 131 */   protected Context context; protected Map<String, OpModeAndMeta> opModeClasses = new LinkedHashMap();
+/* 132 */   protected Map<String, OpModeObjectAndMeta> opModeObjects = new LinkedHashMap();
+/* 133 */   protected volatile boolean opmodesAreRegistered = false;
+/* 134 */   protected String activeOpModeName = "$Stop$Robot$";
+/* 135 */   protected OpMode activeOpMode = DEFAULT_OP_MODE;
+/* 136 */   protected String queuedOpModeName = "$Stop$Robot$";
+/* 137 */   protected HardwareMap hardwareMap = null;
+/* 138 */   protected EventLoopManager eventLoopManager = null;
+/* 139 */   protected final WeakReferenceSet<OpModeManagerNotifier.Notifications> listeners = new WeakReferenceSet();
+/* 140 */   protected OpModeStuckCodeMonitor stuckMonitor = null;
+/*     */   
+/* 142 */   protected OpModeState opModeState = OpModeState.INIT;
+/* 143 */   protected boolean opModeSwapNeeded = false;
+/* 144 */   protected boolean callToInitNeeded = false;
+/* 145 */   protected boolean callToStartNeeded = false;
+/* 146 */   protected boolean gamepadResetNeeded = false;
+/* 147 */   protected boolean telemetryClearNeeded = false;
+/* 148 */   protected AtomicReference<OpModeStateTransition> nextOpModeState = new AtomicReference(null);
+/*     */   
+/* 150 */   protected static final WeakHashMap<Activity, OpModeManagerImpl> mapActivityToOpModeManager = new WeakHashMap();
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public OpModeManagerImpl(Activity activity, HardwareMap hardwareMap)
+/*     */   {
+/* 158 */     this.hardwareMap = hardwareMap;
+/*     */     
+/*     */ 
+/* 161 */     register("$Stop$Robot$", DefaultOpMode.class);
+/*     */     
+/*     */ 
+/* 164 */     initActiveOpMode("$Stop$Robot$");
+/*     */     
+/* 166 */     this.context = activity;
+/* 167 */     synchronized (mapActivityToOpModeManager) {
+/* 168 */       mapActivityToOpModeManager.put(activity, this);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   /* Error */
+/*     */   public static OpModeManagerImpl getOpModeManagerOfActivity(Activity activity)
+/*     */   {
+/*     */     // Byte code:
+/*     */     //   0: getstatic 32	com/qualcomm/robotcore/eventloop/opmode/OpModeManagerImpl:mapActivityToOpModeManager	Ljava/util/WeakHashMap;
+/*     */     //   3: dup
+/*     */     //   4: astore_1
+/*     */     //   5: monitorenter
+/*     */     //   6: getstatic 32	com/qualcomm/robotcore/eventloop/opmode/OpModeManagerImpl:mapActivityToOpModeManager	Ljava/util/WeakHashMap;
+/*     */     //   9: aload_0
+/*     */     //   10: invokevirtual 34	java/util/WeakHashMap:get	(Ljava/lang/Object;)Ljava/lang/Object;
+/*     */     //   13: checkcast 35	com/qualcomm/robotcore/eventloop/opmode/OpModeManagerImpl
+/*     */     //   16: aload_1
+/*     */     //   17: monitorexit
+/*     */     //   18: areturn
+/*     */     //   19: astore_2
+/*     */     //   20: aload_1
+/*     */     //   21: monitorexit
+/*     */     //   22: aload_2
+/*     */     //   23: athrow
+/*     */     // Line number table:
+/*     */     //   Java source line #174	-> byte code offset #0
+/*     */     //   Java source line #175	-> byte code offset #6
+/*     */     //   Java source line #176	-> byte code offset #19
+/*     */     // Local variable table:
+/*     */     //   start	length	slot	name	signature
+/*     */     //   0	24	0	activity	Activity
+/*     */     //   4	17	1	Ljava/lang/Object;	Object
+/*     */     //   19	4	2	localObject1	Object
+/*     */     // Exception table:
+/*     */     //   from	to	target	type
+/*     */     //   6	18	19	finally
+/*     */     //   19	22	19	finally
+/*     */   }
+/*     */   
+/*     */   public void init(EventLoopManager eventLoopManager)
+/*     */   {
+/* 181 */     this.stuckMonitor = new OpModeStuckCodeMonitor();
+/* 182 */     this.eventLoopManager = eventLoopManager;
+/*     */   }
+/*     */   
+/*     */   public void teardown() {
+/* 186 */     this.stuckMonitor.shutdown();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public OpMode registerListener(OpModeManagerNotifier.Notifications listener)
+/*     */   {
+/* 195 */     synchronized (this.listeners) {
+/* 196 */       this.listeners.add(listener);
+/* 197 */       return this.activeOpMode;
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public void unregisterListener(OpModeManagerNotifier.Notifications listener)
+/*     */   {
+/* 203 */     synchronized (this.listeners) {
+/* 204 */       this.listeners.remove(listener);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void setActiveOpMode(OpMode opMode, String activeOpModeName) {
+/* 209 */     synchronized (this.listeners) {
+/* 210 */       this.activeOpMode = opMode;
+/* 211 */       this.activeOpModeName = activeOpModeName;
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void registerOpModes(OpModeRegister register)
+/*     */   {
+/* 223 */     register.register(this);
+/* 224 */     this.opmodesAreRegistered = true;
+/*     */   }
+/*     */   
+/*     */   public boolean areOpModesRegistered() {
+/* 228 */     return this.opmodesAreRegistered;
+/*     */   }
+/*     */   
+/*     */   public void setHardwareMap(HardwareMap hardwareMap)
+/*     */   {
+/* 233 */     this.hardwareMap = hardwareMap;
+/*     */   }
+/*     */   
+/*     */   public HardwareMap getHardwareMap() {
+/* 237 */     return this.hardwareMap;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public List<OpModeMeta> getOpModes()
+/*     */   {
+/* 246 */     Assert.assertTrue(this.opmodesAreRegistered);
+/* 247 */     List<OpModeMeta> result = new LinkedList();
+/* 248 */     for (OpModeAndMeta opModeAndMetaData : this.opModeClasses.values()) {
+/* 249 */       if (!opModeAndMetaData.meta.name.equals("$Stop$Robot$")) {
+/* 250 */         result.add(opModeAndMetaData.meta);
+/*     */       }
+/*     */     }
+/* 253 */     for (OpModeObjectAndMeta opModeObjectAndMeta : this.opModeObjects.values()) {
+/* 254 */       result.add(opModeObjectAndMeta.meta);
+/*     */     }
+/* 256 */     return result;
+/*     */   }
+/*     */   
+/*     */   private boolean isOpModeRegistered(String name) {
+/* 260 */     return (this.opModeClasses.containsKey(name)) || (this.opModeObjects.containsKey(name));
+/*     */   }
+/*     */   
+/*     */   public String getActiveOpModeName() {
+/* 264 */     return this.activeOpModeName;
+/*     */   }
+/*     */   
+/*     */   public OpMode getActiveOpMode() {
+/* 268 */     return this.activeOpMode;
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public void initActiveOpMode(String name)
+/*     */   {
+/* 275 */     OpModeStateTransition newState = new OpModeStateTransition();
+/* 276 */     newState.queuedOpModeName = name;
+/* 277 */     newState.opModeSwapNeeded = Boolean.valueOf(true);
+/* 278 */     newState.callToInitNeeded = Boolean.valueOf(true);
+/* 279 */     newState.gamepadResetNeeded = Boolean.valueOf(true);
+/* 280 */     newState.telemetryClearNeeded = Boolean.valueOf(!name.equals("$Stop$Robot$"));
+/* 281 */     newState.callToStartNeeded = Boolean.valueOf(false);
+/*     */     
+/*     */ 
+/* 284 */     this.nextOpModeState.set(newState);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */   public void startActiveOpMode()
+/*     */   {
+/* 290 */     OpModeStateTransition existingState = null;
+/*     */     for (;;) { OpModeStateTransition newState;
+/*     */       OpModeStateTransition newState;
+/* 293 */       if (existingState != null) {
+/* 294 */         newState = existingState.copy();
+/*     */       } else {
+/* 296 */         newState = new OpModeStateTransition();
+/*     */       }
+/* 298 */       newState.callToStartNeeded = Boolean.valueOf(true);
+/* 299 */       if (this.nextOpModeState.compareAndSet(existingState, newState))
+/*     */         break;
+/* 301 */       Thread.yield();
+/* 302 */       existingState = (OpModeStateTransition)this.nextOpModeState.get();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public void stopActiveOpMode()
+/*     */   {
+/* 308 */     callActiveOpModeStop();
+/* 309 */     initActiveOpMode("$Stop$Robot$");
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */   public void runActiveOpMode(Gamepad[] gamepads)
+/*     */   {
+/* 316 */     OpModeStateTransition transition = (OpModeStateTransition)this.nextOpModeState.getAndSet(null);
+/* 317 */     if (transition != null) {
+/* 318 */       transition.apply();
+/*     */     }
+/* 320 */     this.activeOpMode.time = this.activeOpMode.getRuntime();
+/* 321 */     this.activeOpMode.gamepad1 = gamepads[0];
+/* 322 */     this.activeOpMode.gamepad2 = gamepads[1];
+/*     */     
+/*     */ 
+/*     */ 
+/* 326 */     if (this.gamepadResetNeeded) {
+/* 327 */       this.activeOpMode.gamepad1.reset();
+/* 328 */       this.activeOpMode.gamepad2.reset();
+/* 329 */       this.gamepadResetNeeded = false;
+/*     */     }
+/*     */     
+/* 332 */     if ((this.telemetryClearNeeded) && (this.eventLoopManager != null))
+/*     */     {
+/*     */ 
+/*     */ 
+/* 336 */       TelemetryMessage telemetry = new TelemetryMessage();
+/* 337 */       telemetry.addData("\000", "");
+/* 338 */       this.eventLoopManager.sendTelemetryData(telemetry);
+/* 339 */       this.telemetryClearNeeded = false;
+/*     */     }
+/*     */     
+/* 342 */     if (this.opModeSwapNeeded) {
+/* 343 */       callActiveOpModeStop();
+/* 344 */       performOpModeSwap();
+/* 345 */       this.opModeSwapNeeded = false;
+/*     */     }
+/*     */     
+/* 348 */     if (this.callToInitNeeded) {
+/* 349 */       this.activeOpMode.gamepad1 = gamepads[0];
+/* 350 */       this.activeOpMode.gamepad2 = gamepads[1];
+/* 351 */       this.activeOpMode.hardwareMap = this.hardwareMap;
+/* 352 */       this.activeOpMode.opModeServices = this;
+/*     */       
+/*     */ 
+/*     */ 
+/*     */ 
+/* 357 */       if (!this.activeOpModeName.equals("$Stop$Robot$")) {
+/* 358 */         resetHardwareForOpMode();
+/*     */       }
+/*     */       
+/* 361 */       this.activeOpMode.resetStartTime();
+/* 362 */       callActiveOpModeInit();
+/* 363 */       this.opModeState = OpModeState.INIT;
+/* 364 */       this.callToInitNeeded = false;
+/* 365 */       NetworkConnectionHandler.getInstance().sendCommand(new Command("CMD_INIT_OP_MODE_RESP", this.activeOpModeName));
+/*     */     }
+/*     */     
+/* 368 */     if (this.callToStartNeeded) {
+/* 369 */       callActiveOpModeStart();
+/* 370 */       this.opModeState = OpModeState.LOOPING;
+/* 371 */       this.callToStartNeeded = false;
+/* 372 */       NetworkConnectionHandler.getInstance().sendCommand(new Command("CMD_RUN_OP_MODE_RESP", this.activeOpModeName));
+/*     */     }
+/*     */     
+/* 375 */     if (this.opModeState == OpModeState.INIT) {
+/* 376 */       callActiveOpModeInitLoop();
+/* 377 */     } else if (this.opModeState == OpModeState.LOOPING) {
+/* 378 */       callActiveOpModeLoop();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void resetHardwareForOpMode() {
+/* 383 */     for (HardwareDevice device : this.hardwareMap) {
+/* 384 */       device.resetDeviceConfigurationForOpMode();
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   public void logOpModes()
+/*     */   {
+/* 390 */     int opModeCount = this.opModeClasses.size() + this.opModeObjects.size();
+/* 391 */     String format = "   Op Mode: name=\"%s\" flavor=%s group=\"%s\"";
+/* 392 */     RobotLog.i("There are " + opModeCount + " Op Modes");
+/* 393 */     for (Map.Entry<String, OpModeAndMeta> entry : this.opModeClasses.entrySet()) {
+/* 394 */       RobotLog.i(format, new Object[] { entry.getKey(), ((OpModeAndMeta)entry.getValue()).meta.flavor, ((OpModeAndMeta)entry.getValue()).meta.group });
+/*     */     }
+/* 396 */     for (Map.Entry<String, OpModeObjectAndMeta> entry : this.opModeObjects.entrySet()) {
+/* 397 */       RobotLog.i(format, new Object[] { entry.getKey(), ((OpModeObjectAndMeta)entry.getValue()).meta.flavor, ((OpModeObjectAndMeta)entry.getValue()).meta.group });
+/*     */     }
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void register(String name, Class opMode)
+/*     */   {
+/* 408 */     register(new OpModeMeta(name), opMode);
+/*     */   }
+/*     */   
+/*     */   public void register(OpModeMeta meta, Class opMode) {
+/* 412 */     if (isOpModeRegistered(meta.name)) throw new IllegalArgumentException(String.format("Can't register OpMode name twice: '%s'", new Object[] { meta.name }));
+/* 413 */     this.opModeClasses.put(meta.name, new OpModeAndMeta(meta, opMode));
+/* 414 */     RobotLog.dd("OpmodeRegistration", String.format("registered {%s} as {%s}", new Object[] { opMode.getSimpleName(), meta.name }));
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void register(String name, OpMode opMode)
+/*     */   {
+/* 426 */     register(new OpModeMeta(name), opMode);
+/*     */   }
+/*     */   
+/*     */   public void register(OpModeMeta meta, OpMode opMode) {
+/* 430 */     if (isOpModeRegistered(meta.name)) throw new IllegalArgumentException(String.format("Can't register OpMode name twice: '%s'", new Object[] { meta.name }));
+/* 431 */     this.opModeObjects.put(meta.name, new OpModeObjectAndMeta(meta, opMode));
+/* 432 */     RobotLog.dd("OpmodeRegistration", String.format("registered instance as {%s}", new Object[] { meta }));
+/*     */   }
+/*     */   
+/*     */   private void performOpModeSwap() {
+/* 436 */     RobotLog.i("Attempting to switch to op mode " + this.queuedOpModeName);
+/*     */     try
+/*     */     {
+/* 439 */       if (this.opModeObjects.containsKey(this.queuedOpModeName)) {
+/* 440 */         setActiveOpMode(((OpModeObjectAndMeta)this.opModeObjects.get(this.queuedOpModeName)).opMode, this.queuedOpModeName);
+/*     */       } else {
+/* 442 */         setActiveOpMode((OpMode)((OpModeAndMeta)this.opModeClasses.get(this.queuedOpModeName)).clazz.newInstance(), this.queuedOpModeName);
+/*     */       }
+/*     */     } catch (InstantiationException e) {
+/* 445 */       failedToSwapOpMode(e);
+/*     */     } catch (IllegalAccessException e) {
+/* 447 */       failedToSwapOpMode(e);
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   private void failedToSwapOpMode(Exception e) {
+/* 452 */     RobotLog.e("Unable to start op mode " + this.activeOpModeName);
+/* 453 */     RobotLog.logStacktrace(e);
+/* 454 */     setActiveOpMode(DEFAULT_OP_MODE, "$Stop$Robot$");
+/*     */   }
+/*     */   
+/*     */   protected void callActiveOpModeStop() {
+/* 458 */     detectStuck("stop()", new Runnable()
+/*     */     {
+/* 460 */       public void run() { OpModeManagerImpl.this.activeOpMode.stop(); }
+/*     */     });
+/* 462 */     synchronized (this.listeners) {
+/* 463 */       for (OpModeManagerNotifier.Notifications listener : this.listeners) {
+/* 464 */         listener.onOpModePostStop(this.activeOpMode);
+/*     */       }
+/*     */     }
+/* 467 */     for (HardwareDevice device : this.hardwareMap) {
+/* 468 */       if ((device instanceof OpModeManagerNotifier.Notifications)) {
+/* 469 */         ((OpModeManagerNotifier.Notifications)device).onOpModePostStop(this.activeOpMode);
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void detectStuck(String method, Runnable runnable) {
+/* 475 */     detectStuck(method, runnable, false);
+/*     */   }
+/*     */   
+/*     */   protected void detectStuck(String method, Runnable runnable, boolean resetDebuggerCheck) {
+/* 479 */     this.stuckMonitor.startMonitoring(method, resetDebuggerCheck);
+/*     */     try {
+/* 481 */       runnable.run();
+/*     */     } finally {
+/* 483 */       this.stuckMonitor.stopMonitoring();
+/*     */     } }
+/*     */   
+/*     */   protected class OpModeStuckCodeMonitor { ExecutorService executorService;
+/*     */     Semaphore stopped;
+/*     */     
+/* 489 */     protected OpModeStuckCodeMonitor() { this.executorService = ThreadPool.newSingleThreadExecutor();
+/* 490 */       this.stopped = new Semaphore(0);
+/* 491 */       this.acquired = null;
+/* 492 */       this.debuggerDetected = false;
+/*     */     }
+/*     */     
+/*     */     public void startMonitoring(String method, boolean resetDebuggerCheck)
+/*     */     {
+/* 497 */       if (this.acquired != null)
+/* 498 */         try { this.acquired.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt();
+/*     */         }
+/* 500 */       this.method = method;
+/* 501 */       this.stopped.drainPermits();
+/* 502 */       this.acquired = new CountDownLatch(1);
+/* 503 */       this.executorService.execute(new Runner());
+/* 504 */       if (resetDebuggerCheck) {
+/* 505 */         this.debuggerDetected = false;
+/*     */       }
+/*     */     }
+/*     */     
+/*     */     public void stopMonitoring() {
+/* 510 */       this.stopped.release();
+/*     */     }
+/*     */     
+/*     */ 
+/* 514 */     public void shutdown() { this.executorService.shutdownNow(); }
+/*     */     
+/*     */     CountDownLatch acquired;
+/*     */     boolean debuggerDetected;
+/*     */     String method;
+/*     */     protected boolean checkForDebugger() {
+/* 520 */       this.debuggerDetected = ((this.debuggerDetected) || (Debug.isDebuggerConnected()));
+/* 521 */       return this.debuggerDetected;
+/*     */     }
+/*     */     
+/*     */     protected class Runner implements Runnable { protected Runner() {}
+/*     */       
+/* 526 */       public void run() { boolean errorWasSet = false;
+/*     */         
+/*     */         try
+/*     */         {
+/* 530 */           if (OpModeManagerImpl.OpModeStuckCodeMonitor.this.checkForDebugger())
+/*     */             return;
+/* 532 */           if (!OpModeManagerImpl.OpModeStuckCodeMonitor.this.stopped.tryAcquire(5L, TimeUnit.SECONDS))
+/*     */           {
+/* 534 */             if (OpModeManagerImpl.OpModeStuckCodeMonitor.this.checkForDebugger())
+/*     */               return;
+/* 536 */             String message = String.format(OpModeManagerImpl.this.context.getString(R.string.errorOpModeStuck), new Object[] { OpModeManagerImpl.this.activeOpModeName, OpModeManagerImpl.OpModeStuckCodeMonitor.this.method });
+/* 537 */             errorWasSet = RobotLog.setGlobalErrorMsg(message);
+/* 538 */             RobotLog.e(message);
+/* 539 */             AppUtil.getInstance().showToast(OpModeManagerImpl.this.context, String.format(OpModeManagerImpl.this.context.getString(R.string.toastOpModeStuck), new Object[] { OpModeManagerImpl.OpModeStuckCodeMonitor.this.method }));
+/*     */             
+/* 541 */             Thread.sleep(1000L);
+/*     */             
+/* 543 */             AppUtil.getInstance().restartApp(-1);
+/*     */           }
+/*     */         }
+/*     */         catch (InterruptedException e) {
+/* 547 */           if (errorWasSet) RobotLog.clearGlobalErrorMsg();
+/*     */         } finally {
+/* 549 */           OpModeManagerImpl.OpModeStuckCodeMonitor.this.acquired.countDown();
+/*     */         }
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */   
+/*     */   protected void callActiveOpModeInit() {
+/* 556 */     synchronized (this.listeners) {
+/* 557 */       for (OpModeManagerNotifier.Notifications listener : this.listeners) {
+/* 558 */         listener.onOpModePreInit(this.activeOpMode);
+/*     */       }
+/*     */     }
+/* 561 */     for (HardwareDevice device : this.hardwareMap) {
+/* 562 */       if ((device instanceof OpModeManagerNotifier.Notifications)) {
+/* 563 */         ((OpModeManagerNotifier.Notifications)device).onOpModePreInit(this.activeOpMode);
+/*     */       }
+/*     */     }
+/*     */     
+/* 567 */     this.activeOpMode.preInit();
+/* 568 */     detectStuck("init()", new Runnable()
+/*     */     {
+/* 570 */       public void run() { OpModeManagerImpl.this.activeOpMode.init(); } }, true);
+/*     */   }
+/*     */   
+/*     */   protected void callActiveOpModeStart()
+/*     */   {
+/* 575 */     synchronized (this.listeners) {
+/* 576 */       for (OpModeManagerNotifier.Notifications listener : this.listeners) {
+/* 577 */         listener.onOpModePreStart(this.activeOpMode);
+/*     */       }
+/*     */     }
+/* 580 */     for (HardwareDevice device : this.hardwareMap) {
+/* 581 */       if ((device instanceof OpModeManagerNotifier.Notifications)) {
+/* 582 */         ((OpModeManagerNotifier.Notifications)device).onOpModePreStart(this.activeOpMode);
+/*     */       }
+/*     */     }
+/* 585 */     detectStuck("start()", new Runnable()
+/*     */     {
+/* 587 */       public void run() { OpModeManagerImpl.this.activeOpMode.start(); }
+/*     */     });
+/*     */   }
+/*     */   
+/*     */   protected void callActiveOpModeInitLoop() {
+/* 592 */     detectStuck("init_loop()", new Runnable()
+/*     */     {
+/* 594 */       public void run() { OpModeManagerImpl.this.activeOpMode.init_loop(); }
+/* 595 */     });
+/* 596 */     this.activeOpMode.postInitLoop();
+/*     */   }
+/*     */   
+/*     */   protected void callActiveOpModeLoop() {
+/* 600 */     detectStuck("loop()", new Runnable()
+/*     */     {
+/* 602 */       public void run() { OpModeManagerImpl.this.activeOpMode.loop(); }
+/* 603 */     });
+/* 604 */     this.activeOpMode.postLoop();
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static void updateTelemetryNow(OpMode opMode, TelemetryMessage telemetry)
+/*     */   {
+/* 613 */     opMode.updateTelemetryNow(telemetry);
+/*     */   }
+/*     */   
+/*     */   public void refreshUserTelemetry(TelemetryMessage telemetry, double sInterval) {
+/* 617 */     this.eventLoopManager.getEventLoop().refreshUserTelemetry(telemetry, sInterval);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public void requestOpModeStop(OpMode opModeToStopIfActive)
+/*     */   {
+/* 628 */     this.eventLoopManager.getEventLoop().requestOpModeStop(opModeToStopIfActive);
+/*     */   }
+/*     */   
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */   public static class DefaultOpMode
+/*     */     extends OpMode
+/*     */   {
+/*     */     private long nanoFirstSafe;
+/*     */     
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */     public DefaultOpMode()
+/*     */     {
+/* 653 */       this.nanoFirstSafe = 0L;
+/*     */     }
+/*     */     
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */     public void init()
+/*     */     {
+/* 662 */       moveToSafeState();
+/*     */     }
+/*     */     
+/*     */     public void init_loop()
+/*     */     {
+/* 667 */       moveToSafeState();
+/* 668 */       this.telemetry.addData("Status", "Robot is stopped");
+/*     */     }
+/*     */     
+/*     */     public void loop()
+/*     */     {
+/* 673 */       moveToSafeState();
+/* 674 */       this.telemetry.addData("Status", "Robot is stopped");
+/*     */     }
+/*     */     
+/*     */ 
+/*     */ 
+/*     */     public void stop() {}
+/*     */     
+/*     */ 
+/*     */     private void moveToSafeState()
+/*     */     {
+/* 684 */       if (this.nanoFirstSafe == 0L) {
+/* 685 */         this.nanoFirstSafe = System.nanoTime();
+/*     */       }
+/* 687 */       long now = System.nanoTime();
+/*     */       
+/*     */ 
+/* 690 */       for (DcMotorSimple motor : this.hardwareMap.getAll(DcMotorSimple.class)) {
+/* 691 */         motor.setPower(0.0D);
+/*     */       }
+/*     */       
+/*     */ 
+/*     */ 
+/*     */ 
+/*     */ 
+/* 698 */       for (DcMotor dcMotor : this.hardwareMap.getAll(DcMotor.class))
+/*     */       {
+/* 700 */         dcMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+/*     */       }
+/*     */       
+/*     */ 
+/*     */ 
+/* 705 */       for (ServoController servoController : this.hardwareMap.getAll(ServoController.class))
+/*     */       {
+/* 707 */         servoController.pwmDisable();
+/*     */       }
+/*     */       
+/*     */ 
+/*     */ 
+/* 712 */       for (LightSensor light : this.hardwareMap.getAll(LightSensor.class))
+/*     */       {
+/* 714 */         light.enableLed(false);
+/*     */       }
+/*     */     }
+/*     */   }
+/*     */ }
+
+
+/* Location:              C:\Users\exploravision\Desktop\RobotCore-release.jar!\classes.jar!\com\qualcomm\robotcore\eventloop\opmode\OpModeManagerImpl.class
+ * Java compiler version: 7 (51.0)
+ * JD-Core Version:       0.7.1
  */
-
-package com.qualcomm.robotcore.eventloop.opmode;
-
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import com.qualcomm.robotcore.eventloop.EventLoopManager;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.hardware.HardwareDevice;
-import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.LightSensor;
-import com.qualcomm.robotcore.hardware.ServoController;
-import com.qualcomm.robotcore.robocol.TelemetryMessage;
-import com.qualcomm.robotcore.util.RobotLog;
-
-/**
- * Manages Op Modes
- *
- * Able to switch between op modes
- */
-@SuppressWarnings("unused")
-public class OpModeManagerImpl implements OpModeServices, OpModeManager, OpModeManagerNotifier {
-
-	// ------------------------------------------------------------------------------------------------
-	// Types
-	// ------------------------------------------------------------------------------------------------
-
-	class OpModeStateTransition {
-		String queuedOpModeName = null;
-		Boolean opModeSwapNeeded = null;
-		Boolean callToInitNeeded = null;
-		Boolean gamepadResetNeeded = null;
-		Boolean telemetryClearNeeded = null;
-		Boolean callToStartNeeded = null;
-
-		void apply() {
-			if (queuedOpModeName != null) OpModeManagerImpl.this.queuedOpModeName = queuedOpModeName;
-
-			// We never clear state here; that's done in runActiveOpMode()
-			if (opModeSwapNeeded != null) OpModeManagerImpl.this.opModeSwapNeeded = opModeSwapNeeded;
-			if (callToInitNeeded != null) OpModeManagerImpl.this.callToInitNeeded = callToInitNeeded;
-			if (gamepadResetNeeded != null) OpModeManagerImpl.this.gamepadResetNeeded = gamepadResetNeeded;
-			if (telemetryClearNeeded != null) OpModeManagerImpl.this.telemetryClearNeeded = telemetryClearNeeded;
-			if (callToStartNeeded != null) OpModeManagerImpl.this.callToStartNeeded = callToStartNeeded;
-		}
-
-		OpModeStateTransition copy() {
-			final OpModeStateTransition result = new OpModeStateTransition();
-			result.queuedOpModeName = queuedOpModeName;
-			result.opModeSwapNeeded = opModeSwapNeeded;
-			result.callToInitNeeded = callToInitNeeded;
-			result.gamepadResetNeeded = gamepadResetNeeded;
-			result.telemetryClearNeeded = telemetryClearNeeded;
-			result.callToStartNeeded = callToStartNeeded;
-			return result;
-		}
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// State
-	// ------------------------------------------------------------------------------------------------
-
-	public static final String DEFAULT_OP_MODE_NAME = OpModeManager.DEFAULT_OP_MODE_NAME;
-	public static final OpMode DEFAULT_OP_MODE = new DefaultOpMode();
-
-	protected enum OpModeState {
-		INIT, LOOPING
-	}
-
-	protected static class OpModeObjectAndMeta {
-		public final OpModeMeta meta;
-		public final OpMode opMode;
-
-		public OpModeObjectAndMeta(final OpModeMeta meta, final OpMode opMode) {
-			this.meta = meta;
-			this.opMode = opMode;
-		}
-	}
-
-	protected Context context;
-	protected Map<String, OpModeAndMeta> opModeClasses = new LinkedHashMap<String, OpModeAndMeta>();
-	protected Map<String, OpModeObjectAndMeta> opModeObjects = new LinkedHashMap<String, OpModeObjectAndMeta>();
-	protected volatile boolean opmodesAreRegistered = false;
-	protected String activeOpModeName = DEFAULT_OP_MODE_NAME;
-	protected OpMode activeOpMode = DEFAULT_OP_MODE;
-	protected String queuedOpModeName = DEFAULT_OP_MODE_NAME;
-	protected HardwareMap hardwareMap = null;
-	protected EventLoopManager eventLoopManager = null;
-	protected final WeakReferenceSet<OpModeManagerNotifier.Notifications> listeners = new WeakReferenceSet<OpModeManagerNotifier.Notifications>();
-	protected OpModeStuckCodeMonitor stuckMonitor = null;
-
-	protected OpModeState opModeState = OpModeState.INIT;
-	protected boolean opModeSwapNeeded = false;
-	protected boolean callToInitNeeded = false;
-	protected boolean callToStartNeeded = false;
-	protected boolean gamepadResetNeeded = false;
-	protected boolean telemetryClearNeeded = false;
-	protected AtomicReference<OpModeStateTransition> nextOpModeState = new AtomicReference<OpModeStateTransition>(null);
-
-	protected static final WeakHashMap<Activity, OpModeManagerImpl> mapActivityToOpModeManager = new WeakHashMap<Activity, OpModeManagerImpl>();
-
-	// ------------------------------------------------------------------------------------------------
-	// Construction
-	// ------------------------------------------------------------------------------------------------
-
-	// Called on FtcRobotControllerService thread
-	public OpModeManagerImpl(final Activity activity, final HardwareMap hardwareMap) {
-		this.hardwareMap = hardwareMap;
-
-		// register our default op mode first, that way the user can override it (eh?)
-		register(DEFAULT_OP_MODE_NAME, DefaultOpMode.class);
-
-		// switch to the default op mode
-		initActiveOpMode(DEFAULT_OP_MODE_NAME);
-
-		context = activity;
-		synchronized (mapActivityToOpModeManager) {
-			mapActivityToOpModeManager.put(activity, this);
-		}
-
-	}
-
-	public static OpModeManagerImpl getOpModeManagerOfActivity(final Activity activity) {
-		synchronized (mapActivityToOpModeManager) {
-			return mapActivityToOpModeManager.get(activity);
-		}
-	}
-
-	// called from the RobotSetupRunnable.run thread
-	public void init(final EventLoopManager eventLoopManager) {
-		stuckMonitor = new OpModeStuckCodeMonitor();
-		this.eventLoopManager = eventLoopManager;
-	}
-
-	public void teardown() {
-		stuckMonitor.shutdown();
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Notifications
-	// ------------------------------------------------------------------------------------------------
-
-	@Override
-	public OpMode registerListener(final OpModeManagerNotifier.Notifications listener) {
-		synchronized (listeners) {
-			this.listeners.add(listener);
-			return this.activeOpMode;
-		}
-	}
-
-	@Override
-	public void unregisterListener(final OpModeManagerNotifier.Notifications listener) {
-		synchronized (listeners) {
-			this.listeners.remove(listener);
-		}
-	}
-
-	protected void setActiveOpMode(final OpMode opMode, final String activeOpModeName) {
-		synchronized (listeners) {
-			this.activeOpMode = opMode;
-			this.activeOpModeName = activeOpModeName;
-		}
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Accessors
-	// ------------------------------------------------------------------------------------------------
-
-	// called from the RobotSetupRunnable.run thread
-	public void registerOpModes(final OpModeRegister register) {
-		// Call user's code to learn the OpModes
-		register.register(this);
-		opmodesAreRegistered = true;
-	}
-
-	public boolean areOpModesRegistered() {
-		return opmodesAreRegistered;
-	}
-
-	// called from the RobotSetupRunnable.run thread
-	public void setHardwareMap(final HardwareMap hardwareMap) {
-		this.hardwareMap = hardwareMap;
-	}
-
-	public HardwareMap getHardwareMap() {
-		return hardwareMap;
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// OpMode management
-	// ------------------------------------------------------------------------------------------------
-
-	// called on DS receive thread
-	public List<OpModeMeta> getOpModes() {
-		Assert.assertTrue(opmodesAreRegistered);
-		final List<OpModeMeta> result = new LinkedList<OpModeMeta>();
-		for (final OpModeAndMeta opModeAndMetaData : opModeClasses.values()) {
-			if (!opModeAndMetaData.meta.name.equals(DEFAULT_OP_MODE_NAME)) {
-				result.add(opModeAndMetaData.meta);
-			}
-		}
-		for (final OpModeObjectAndMeta opModeObjectAndMeta : opModeObjects.values()) {
-			result.add(opModeObjectAndMeta.meta);
-		}
-		return result;
-	}
-
-	private boolean isOpModeRegistered(final String name) {
-		return opModeClasses.containsKey(name) || opModeObjects.containsKey(name);
-	}
-
-	// called on DS receive thread, event loop thread
-	public String getActiveOpModeName() {
-		return activeOpModeName;
-	}
-
-	// called on the event loop thread
-	public OpMode getActiveOpMode() {
-		return activeOpMode;
-	}
-
-	// called on DS receive thread
-	// initActiveOpMode(DEFAULT_OP_MODE_NAME) is called from event loop thread, FtcRobotControllerService thread
-	public void initActiveOpMode(final String name) {
-
-		final OpModeStateTransition newState = new OpModeStateTransition();
-		newState.queuedOpModeName = name;
-		newState.opModeSwapNeeded = true;
-		newState.callToInitNeeded = true;
-		newState.gamepadResetNeeded = true;
-		newState.telemetryClearNeeded = !name.equals(DEFAULT_OP_MODE_NAME); // no semantic need to clear if we're just stopping
-		newState.callToStartNeeded = false;
-
-		// We *insist* on becoming the new state
-		nextOpModeState.set(newState);
-	}
-
-	// called on DS receive thread
-	public void startActiveOpMode() {
-		// We're happy to modify an existing (init?) state to then do a start
-		OpModeStateTransition existingState = null;
-		for (;;) {
-			OpModeStateTransition newState;
-			if (existingState != null) {
-				newState = existingState.copy();
-			} else {
-				newState = new OpModeStateTransition();
-			}
-			newState.callToStartNeeded = true;
-			if (nextOpModeState.compareAndSet(existingState, newState)) break;
-			Thread.yield();
-			existingState = nextOpModeState.get();
-		}
-	}
-
-	// called on the event loop thread
-	public void stopActiveOpMode() {
-		callActiveOpModeStop();
-		initActiveOpMode(DEFAULT_OP_MODE_NAME);
-	}
-
-	// called on the event loop thread
-	public void runActiveOpMode(final Gamepad[] gamepads) {
-
-		// Apply a state transition if one is pending
-		final OpModeStateTransition transition = nextOpModeState.getAndSet(null);
-		if (transition != null) transition.apply();
-
-		activeOpMode.time = activeOpMode.getRuntime();
-		activeOpMode.gamepad1 = gamepads[0];
-		activeOpMode.gamepad2 = gamepads[1];
-
-		// Robustly ensure that gamepad state from previous opmodes doesn't
-		// leak into new opmodes.
-		if (gamepadResetNeeded) {
-			activeOpMode.gamepad1.reset();
-			activeOpMode.gamepad2.reset();
-			gamepadResetNeeded = false;
-		}
-
-		if (telemetryClearNeeded && eventLoopManager != null) {
-			// We clear telemetry once 'init' is pressed in order to
-			// ensure that stale telemetry from previous OpMode runs is
-			// no longer (confusingly) on the screen.
-			final TelemetryMessage telemetry = new TelemetryMessage();
-			telemetry.addData("\0", "");
-			eventLoopManager.sendTelemetryData(telemetry);
-			telemetryClearNeeded = false;
-		}
-
-		if (opModeSwapNeeded) {
-			callActiveOpModeStop();
-			performOpModeSwap();
-			opModeSwapNeeded = false;
-		}
-
-		if (callToInitNeeded) {
-			activeOpMode.gamepad1 = gamepads[0];
-			activeOpMode.gamepad2 = gamepads[1];
-			activeOpMode.hardwareMap = hardwareMap;
-			activeOpMode.opModeServices = this;
-
-			// The point about resetting the hardware is to have it in the same state
-			// every time for the *user's* code so that they can simplify their initialization
-			// logic. There's no point in bothering / spending the time for the default opmode.
-			if (!activeOpModeName.equals(DEFAULT_OP_MODE_NAME)) {
-				resetHardwareForOpMode();
-			}
-
-			activeOpMode.resetStartTime();
-			callActiveOpModeInit();
-			opModeState = OpModeState.INIT;
-			callToInitNeeded = false;
-			NetworkConnectionHandler.getInstance().sendCommand(new Command(RobotCoreCommandList.CMD_INIT_OP_MODE_RESP, activeOpModeName)); // send
-// *truth* to DS
-		}
-
-		if (callToStartNeeded) {
-			callActiveOpModeStart();
-			opModeState = OpModeState.LOOPING;
-			callToStartNeeded = false;
-			NetworkConnectionHandler.getInstance().sendCommand(new Command(RobotCoreCommandList.CMD_RUN_OP_MODE_RESP, activeOpModeName)); // send
-// *truth* to DS
-		}
-
-		if (opModeState == OpModeState.INIT)
-			callActiveOpModeInitLoop();
-		else if (opModeState == OpModeState.LOOPING) callActiveOpModeLoop();
-	}
-
-	// resets the hardware to the state expected at the start of an opmode
-	protected void resetHardwareForOpMode() {
-		for (final HardwareDevice device : hardwareMap) {
-			device.resetDeviceConfigurationForOpMode();
-		}
-	}
-
-	// not called
-	public void logOpModes() {
-		final int opModeCount = opModeClasses.size() + opModeObjects.size();
-		final String format = "   Op Mode: name=\"%s\" flavor=%s group=\"%s\"";
-		RobotLog.i("There are " + opModeCount + " Op Modes");
-		for (final Map.Entry<String, OpModeAndMeta> entry : opModeClasses.entrySet()) {
-			RobotLog.i(format, entry.getKey(), entry.getValue().meta.flavor, entry.getValue().meta.group);
-		}
-		for (final Map.Entry<String, OpModeObjectAndMeta> entry : opModeObjects.entrySet()) {
-			RobotLog.i(format, entry.getKey(), entry.getValue().meta.flavor, entry.getValue().meta.group);
-		}
-	}
-
-	// Called on FtcRobotControllerService thread
-	/**
-	 * Registers an OpMode <em>class</em> with the name by which it should be known in the driver station.
-	 *
-	 * @param name the name of the OpMode in the driver station
-	 * @param opMode the OpMode class to instantiate when that OpMode is selected
-	 */
-	@Override
-	public void register(final String name, final Class<? extends OpMode> opMode) {
-		register(new OpModeMeta(name), opMode);
-	}
-
-	@Override
-	public void register(final OpModeMeta meta, final Class<? extends OpMode> opMode) {
-		if (isOpModeRegistered(meta.name)) {
-			throw new IllegalArgumentException(String.format("Can't register OpMode name twice: '%s'", meta.name));
-		}
-		opModeClasses.put(meta.name, new OpModeAndMeta(meta, opMode));
-		RobotLog.dd(AnnotatedOpModeRegistrar.TAG, String.format("registered {%s} as {%s}", opMode.getSimpleName(), meta.name));
-	}
-
-	// Called on FtcRobotControllerService thread
-	/**
-	 * Registers an OpMode <em>instance</em> with the name by which it should be known in the driver station.
-	 * This should only be used in environments where it is not possible to pass Class objects. In particular, it
-	 * should not be used with OpModes authored (in Java) using Android Studio.
-	 *
-	 * @param name the name of the OpMode in the driver station
-	 * @param opMode the OpMode instance to use when that OpMode is selected
-	 */
-	@Override
-	public void register(final String name, final OpMode opMode) {
-		register(new OpModeMeta(name), opMode);
-	}
-
-	@Override
-	public void register(final OpModeMeta meta, final OpMode opMode) {
-		if (isOpModeRegistered(meta.name)) {
-			throw new IllegalArgumentException(String.format("Can't register OpMode name twice: '%s'", meta.name));
-		}
-		opModeObjects.put(meta.name, new OpModeObjectAndMeta(meta, opMode));
-		RobotLog.dd(AnnotatedOpModeRegistrar.TAG, String.format("registered instance as {%s}", meta));
-	}
-
-	private void performOpModeSwap() {
-		RobotLog.i("Attempting to switch to op mode " + queuedOpModeName);
-
-		try {
-			if (opModeObjects.containsKey(queuedOpModeName)) {
-				setActiveOpMode(opModeObjects.get(queuedOpModeName).opMode, queuedOpModeName);
-			} else {
-				setActiveOpMode(opModeClasses.get(queuedOpModeName).clazz.newInstance(), queuedOpModeName);
-			}
-		} catch (final InstantiationException e) {
-			failedToSwapOpMode(e);
-		} catch (final IllegalAccessException e) {
-			failedToSwapOpMode(e);
-		}
-	}
-
-	private void failedToSwapOpMode(final Exception e) {
-		RobotLog.e("Unable to start op mode " + activeOpModeName);
-		RobotLog.logStacktrace(e);
-		setActiveOpMode(DEFAULT_OP_MODE, DEFAULT_OP_MODE_NAME);
-	}
-
-	protected void callActiveOpModeStop() {
-		detectStuck("stop()", () -> activeOpMode.stop());
-		synchronized (listeners) {
-			for (OpModeManagerNotifier.Notifications listener : this.listeners) {
-				listener.onOpModePostStop(activeOpMode);
-			}
-		}
-		for (final HardwareDevice device : hardwareMap) {
-			if (device instanceof OpModeManagerNotifier.Notifications) {
-				((OpModeManagerNotifier.Notifications) device).onOpModePostStop(activeOpMode);
-			}
-		}
-	}
-
-	protected void detectStuck(final String method, final Runnable runnable) {
-		detectStuck(method, runnable, false);
-	}
-
-	protected void detectStuck(final String method, final Runnable runnable, final boolean resetDebuggerCheck) {
-		stuckMonitor.startMonitoring(method, resetDebuggerCheck);
-		try {
-			runnable.run();
-		} finally {
-			stuckMonitor.stopMonitoring();
-		}
-	}
-
-	/** A utility class that detects infinite loops in user code */
-	protected class OpModeStuckCodeMonitor {
-		ExecutorService executorService = ThreadPool.newSingleThreadExecutor();
-		Semaphore stopped = new Semaphore(0);
-		CountDownLatch acquired = null;
-		boolean debuggerDetected = false;
-		String method;
-
-		public void startMonitoring(final String method, final boolean resetDebuggerCheck) {
-			// Wait for any previous monitoring to drain
-			if (acquired != null) {
-				try {
-					acquired.await();
-				} catch (final InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
-			}
-			this.method = method;
-			stopped.drainPermits();
-			acquired = new CountDownLatch(1);
-			executorService.execute(new Runner());
-			if (resetDebuggerCheck) {
-				debuggerDetected = false;
-			}
-		}
-
-		public void stopMonitoring() {
-			stopped.release();
-		}
-
-		public void shutdown() {
-			executorService.shutdownNow();
-		}
-
-		protected boolean checkForDebugger() {
-			// Once we see a debugger, we disable timeout checking for the remainder of the OpMode
-			// in order to be sure to avoid premature termination of the app.
-			debuggerDetected = debuggerDetected || Debug.isDebuggerConnected();
-			return debuggerDetected;
-		}
-
-		protected class Runner implements Runnable {
-			@Override
-			public void run() {
-				boolean errorWasSet = false;
-				try {
-					// We won't bother timing if a debugger is attached because single stepping
-					// etc in a debugger can take an arbitrarily long amount of time.
-					if (checkForDebugger()) return;
-
-					if (!stopped.tryAcquire(5, TimeUnit.SECONDS)) {
-						// Timeout hit waiting for opmode to stop. Inform user, then restart app.
-						if (checkForDebugger()) return;
-
-						final String message = String.format(context.getString(R.string.errorOpModeStuck), activeOpModeName, method);
-						errorWasSet = RobotLog.setGlobalErrorMsg(message);
-						RobotLog.e(message);
-						AppUtil.getInstance().showToast(context, String.format(context.getString(R.string.toastOpModeStuck), method));
-						// Wait a touch for message to be seen
-						Thread.sleep(1000);
-						// Restart
-						AppUtil.getInstance().restartApp(-1);
-					}
-				} catch (final InterruptedException e) {
-					// Shutdown complete, return
-					if (errorWasSet) RobotLog.clearGlobalErrorMsg();
-				} finally {
-					acquired.countDown();
-				}
-			}
-		}
-	}
-
-	protected void callActiveOpModeInit() {
-		synchronized (listeners) {
-			for (OpModeManagerNotifier.Notifications listener : this.listeners) {
-				listener.onOpModePreInit(activeOpMode);
-			}
-		}
-		for (final HardwareDevice device : hardwareMap) {
-			if (device instanceof OpModeManagerNotifier.Notifications) {
-				((OpModeManagerNotifier.Notifications) device).onOpModePreInit(activeOpMode);
-			}
-		}
-
-		activeOpMode.preInit();
-		detectStuck("init()", () -> activeOpMode.init(), true);
-	}
-
-	protected void callActiveOpModeStart() {
-		synchronized (listeners) {
-			for (OpModeManagerNotifier.Notifications listener : this.listeners) {
-				listener.onOpModePreStart(activeOpMode);
-			}
-		}
-		for (final HardwareDevice device : hardwareMap) {
-			if (device instanceof OpModeManagerNotifier.Notifications) {
-				((OpModeManagerNotifier.Notifications) device).onOpModePreStart(activeOpMode);
-			}
-		}
-		detectStuck("start()", () -> activeOpMode.start());
-	}
-
-	protected void callActiveOpModeInitLoop() {
-		detectStuck("init_loop()", () -> activeOpMode.init_loop());
-		activeOpMode.postInitLoop();
-	}
-
-	protected void callActiveOpModeLoop() {
-		detectStuck("loop()", () -> activeOpMode.loop());
-		activeOpMode.postLoop();
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// OpModeServices
-	// ------------------------------------------------------------------------------------------------
-
-	/** For the use of {@link TelemetryImpl}. */
-	public static void updateTelemetryNow(final OpMode opMode, final TelemetryMessage telemetry) {
-		opMode.updateTelemetryNow(telemetry);
-	}
-
-	@Override
-	public void refreshUserTelemetry(final TelemetryMessage telemetry, final double sInterval) {
-		eventLoopManager.getEventLoop().refreshUserTelemetry(telemetry, sInterval);
-	}
-
-	/**
-	 * Requests that an OpMode be stopped.
-	 *
-	 * @see OpMode#requestOpModeStop()
-	 */
-	@Override
-	public void requestOpModeStop(final OpMode opModeToStopIfActive) {
-		// We have two basic concerns: (a) is the indicated opMode the active one, and (b) we might
-		// here be running on literally any thread, including the loop() thread or a linear OpMode's
-		// thread.
-		eventLoopManager.getEventLoop().requestOpModeStop(opModeToStopIfActive);
-	}
-
-	// ------------------------------------------------------------------------------------------------
-	// Default OpMode
-	// ------------------------------------------------------------------------------------------------
-
-	/**
-	 * {@link DefaultOpMode} is the opmode that the system runs when no user opmode is active.
-	 * Note that it's not necessarily the case that this opmode runs when a user opmode stops: there
-	 * are situations in which we can transition directly for one user opmode to another.
-	 */
-	public static class DefaultOpMode extends OpMode {
-
-		// ----------------------------------------------------------------------------------------------
-		// State
-		// ----------------------------------------------------------------------------------------------
-
-		private long nanoFirstSafe;
-
-		// ----------------------------------------------------------------------------------------------
-		// Construction
-		// ----------------------------------------------------------------------------------------------
-
-		public DefaultOpMode() {
-			nanoFirstSafe = 0;
-		}
-
-		// ----------------------------------------------------------------------------------------------
-		// Loop operations
-		// ----------------------------------------------------------------------------------------------
-
-		@Override
-		public void init() {
-			moveToSafeState();
-		}
-
-		@Override
-		public void init_loop() {
-			moveToSafeState();
-			telemetry.addData("Status", "Robot is stopped");
-		}
-
-		@Override
-		public void loop() {
-			moveToSafeState();
-			telemetry.addData("Status", "Robot is stopped");
-		}
-
-		@Override
-		public void stop() {
-			// take no action
-		}
-
-		private void moveToSafeState() {
-
-			if (nanoFirstSafe == 0) nanoFirstSafe = System.nanoTime();
-
-			final long now = System.nanoTime();
-
-			// Set all motor powers to zero. The implementation here will also stop any CRServos.
-			for (final DcMotorSimple motor : hardwareMap.getAll(DcMotorSimple.class)) {
-				motor.setPower(0);
-			}
-
-			// set their run mode to something reasonable, and safe. we do this *after*
-			// zeroing the powers as switching modes, on the legacy controller at least,
-			// is not especially zippy. separating out like this is probably paranoia, but
-			// it's harmless
-			for (final DcMotor dcMotor : hardwareMap.getAll(DcMotor.class)) {
-				if (true) {
-					dcMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-				}
-			}
-
-			// power down the servos
-			for (final ServoController servoController : hardwareMap.getAll(ServoController.class)) {
-				if (true) {
-					servoController.pwmDisable();
-				}
-			}
-
-			// turn of light sensors
-			for (final LightSensor light : hardwareMap.getAll(LightSensor.class)) {
-				if (true) {
-					light.enableLed(false);
-				}
-			}
-		}
-	}
-}
