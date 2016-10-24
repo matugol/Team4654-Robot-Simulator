@@ -1,12 +1,16 @@
 package com.qualcomm.simulator;
 
 import java.awt.Color;
+import java.io.IOException;
 import java.util.ArrayList;
 
 import com.qualcomm.ftcrobotcontroller.opmodes.ExampleOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.sun.java.swing.plaf.windows.resources.windows;
+
+import net.java.games.input.*;
+import net.java.games.input.Component.Identifier;
+import net.java.games.input.Controller.Type;
 
 public class Simulator {
 
@@ -15,11 +19,14 @@ public class Simulator {
 	private static float robotX = 72, robotY = 72, robotRotation = 90;
 	private static ArrayList<SimMotor> leftWheels = new ArrayList<SimMotor>(), rightWheels = new ArrayList<SimMotor>();
 
-	private static int targetFPS = 60;
+	private static final int TARGET_FPS = 60;
 	private static float currentFPS = 0;
 
 	private static Window window = new Window();
-
+	
+	private static ControllerEnvironment ce = ControllerEnvironment.getDefaultEnvironment(); 
+	private static Controller controller1, controller2;
+	
 	private enum State {
 		DISABLED,
 		INIT,
@@ -29,6 +36,17 @@ public class Simulator {
 	private static State state = State.DISABLED;
 
 	public static void main(String[] args) {
+		// TODO clean up this mess
+		for (Controller c : ce.getControllers()) {
+			if (c.getType() == Type.GAMEPAD) {
+				if (controller1 == null) {
+					controller1 = c;
+				} else if (controller2 == null) {
+					controller2 = c;
+				}
+			}
+		}		
+		
 		// create window and simulation graphics
 		opMode = new ExampleOpMode();
 		window.repaint();
@@ -48,6 +66,8 @@ public class Simulator {
 		leftWheels.add((SimMotor) robot.get(3));
 		robot.add(new SimMotor(7f, -7f, 180f, "rightback", opMode.hardwareMap));
 		rightWheels.add((SimMotor) robot.get(4));		
+		
+		init();
 	}
 
 	private static Runnable loop() {
@@ -62,7 +82,7 @@ public class Simulator {
 					currentTime = System.nanoTime();
 					deltaTime = currentTime - previousTime;
 
-					if (deltaTime >= 1000000000 / targetFPS) {
+					if (deltaTime >= 1000000000 / TARGET_FPS) {
 						previousTime = currentTime;
 						fpsCount++;
 						fixedUpdate();
@@ -82,24 +102,52 @@ public class Simulator {
 	}
 
 	private static void fixedUpdate() { // Update always advances (1 / targetFPS) of a second
-		worldUpdate(1d / targetFPS);
+		worldUpdate(1d / TARGET_FPS);
 
-		// update gamepads
-
+		updateGamepads();
+		
 		if (state == State.INIT) {
 			opMode.init_loop();
 			opMode.postInitLoop();
+			start();
 		} else if (state == State.ENABLED) {
-			opMode.time += 1d / targetFPS;
+			opMode.time += 1d / TARGET_FPS;
 			opMode.loop();
 			opMode.postLoop();
 		}
-		
-		robotRotation += 0.42f;
-		
+				
 		window.repaint();
 	}
 
+	private static void updateGamepads() {
+		controller1.poll();
+		opMode.gamepad1.a = controller1.getComponents()[0].getPollData() == 1f;
+		opMode.gamepad1.b = controller1.getComponents()[1].getPollData() == 1f;
+		opMode.gamepad1.x = controller1.getComponents()[2].getPollData() == 1f;
+		opMode.gamepad1.y = controller1.getComponents()[3].getPollData() == 1f;
+		opMode.gamepad1.left_bumper = controller1.getComponents()[4].getPollData() == 1f;
+		opMode.gamepad1.right_bumper = controller1.getComponents()[5].getPollData() == 1f;
+		opMode.gamepad1.back = controller1.getComponents()[6].getPollData() == 1f;
+		opMode.gamepad1.start = controller1.getComponents()[7].getPollData() == 1f; // TODO better
+		opMode.gamepad1.left_stick_button = controller1.getComponents()[8].getPollData() == 1f;
+		opMode.gamepad1.right_stick_button = controller1.getComponents()[9].getPollData() == 1f;
+
+		float hat = controller1.getComponents()[10].getPollData();
+		opMode.gamepad1.dpad_left = hat == .875f || hat == 1f || hat == .125f;
+		opMode.gamepad1.dpad_right = hat == .375f || hat == .5f || hat == .675f;
+		opMode.gamepad1.dpad_up = hat == .125f || hat == .25f || hat == .375f;
+		opMode.gamepad1.dpad_down = hat == .675f || hat == .75f || hat == .875f;
+		
+		opMode.gamepad1.left_stick_x = controller1.getComponent(Identifier.Axis.X).getPollData() * -1;
+		opMode.gamepad1.left_stick_y = controller1.getComponent(Identifier.Axis.Y).getPollData();
+		opMode.gamepad1.right_stick_x = controller1.getComponent(Identifier.Axis.RX).getPollData() * -1;
+		opMode.gamepad1.right_stick_y = controller1.getComponent(Identifier.Axis.RY).getPollData();
+		
+		// TODO fix
+		opMode.gamepad1.left_trigger = controller1.getComponent(Identifier.Axis.Z).getPollData();
+		//opMode.gamepad1.right_trigger = controller1.getComponent(Identifier.Axis.RZ).getPollData();
+	}
+	
 	private static void worldUpdate(double timeStep) {
 		float leftAverage = 0f;
 		for (SimMotor motor : leftWheels) {
@@ -113,11 +161,11 @@ public class Simulator {
 		//rightAverage /= rightWheels.size();
 
 		// TODO Movement calculations
-		robotRotation += (leftAverage - rightAverage) * 5.4f;
-		if (robotRotation >= 360f) robotRotation -= 360f;
-		if (robotRotation < 0f) robotRotation += 360;
+		robotRotation += (leftAverage - rightAverage) * 30f * timeStep;
+		while (robotRotation >= 360f) robotRotation -= 360f;
+		while (robotRotation < 0f) robotRotation += 360;
 		
-		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 5f * timeStep);
+		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 21.5f * timeStep);
 		robotX += (float) (distance * Math.cos(Math.toRadians(robotRotation)));
 		robotY -= (float) (distance * Math.sin(Math.toRadians(robotRotation)));
 		

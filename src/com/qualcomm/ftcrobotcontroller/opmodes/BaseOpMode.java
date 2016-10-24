@@ -17,6 +17,8 @@ public abstract class BaseOpMode extends OpMode {
     @Override
     public void init() {
 
+    	System.out.println("addaw");
+    	
         leftFront = hardwareMap.dcMotor.get("leftfront");
         leftBack = hardwareMap.dcMotor.get("leftback");
         rightFront = hardwareMap.dcMotor.get("rightfront");

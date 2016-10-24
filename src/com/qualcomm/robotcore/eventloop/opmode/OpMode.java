@@ -17,11 +17,13 @@ public abstract class OpMode {
 	public void start() {};
 	public abstract void loop();
 	public void stop() {}
-	public void updateTelemetry(Telemetry telemetry) {	telemetry.update(); }
+	public void updateTelemetry(Telemetry telemetry) {	/* telemetry.update(); */ }
 	public void postInitLoop() { updateTelemetry(telemetry); }
 	public void postLoop() { updateTelemetry(telemetry); }
 	
 	public OpMode() {
+		gamepad1 = new Gamepad();
+		gamepad2 = new Gamepad();
 		// set up gamepads, hardwareMap, and telemetry
 	}
 	

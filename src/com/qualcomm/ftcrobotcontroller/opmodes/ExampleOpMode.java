@@ -16,7 +16,7 @@ public class ExampleOpMode extends BaseOpMode {
     }
 
     @Override
-    public void loop() {
+    public void loop() {   	
         // Define control variables
         driveModeButton = gamepad1.dpad_left ? 1 : 0;
         driveControlStickX = gamepad1.left_stick_x;
@@ -79,15 +79,15 @@ public class ExampleOpMode extends BaseOpMode {
         }
 
 //         Telemetry output stream used for debugging and knowing the current state.
-        telemetry.addData("Text", "***Robot Data***");
-        telemetry.addData("State", state);
-        telemetry.addData("Gamepad Left Y", gamepad1.left_stick_y);
+//        telemetry.addData("Text", "***Robot Data***");
+//        telemetry.addData("State", state);
+//        telemetry.addData("Gamepad Left Y", gamepad1.left_stick_y);
 //        telemetry.addData("Left Motor F Power", leftMotorFront.getPower());
 //        telemetry.addData("Left Motor B Power", leftMotorBack.getPower());
 //        telemetry.addData("Right Motor F Power", rightMotorFront.getPower());
 //        telemetry.addData("Right Motor B Power", rightMotorBack.getPower());
-        telemetry.addData("GP2 LB LT", gamepad2.left_bumper + " " + gamepad2.left_trigger);
-        telemetry.addData("GP2 RB RT", gamepad2.right_bumper + " " + gamepad2.right_trigger);
+//        telemetry.addData("GP2 LB LT", gamepad2.left_bumper + " " + gamepad2.left_trigger);
+//        telemetry.addData("GP2 RB RT", gamepad2.right_bumper + " " + gamepad2.right_trigger);
 
 
 //        telemetry.addData("Color Sensor", sensorIsRed() ? "Redder" : "Bluer");

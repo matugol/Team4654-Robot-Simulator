@@ -24,7 +24,7 @@ public class Window extends JFrame {
 		//setIgnoreRepaint(true);
 		//setResizable(false);
 		//pack();
-		setSize(new Dimension(800, 800));
+		setSize(new Dimension(12 * 12 * scale, 12 * 12 * scale));
 		setVisible(true);
 	}
 	
