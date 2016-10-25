@@ -69,7 +69,7 @@ public class SimMotor implements Component, DcMotor {
 	public void setZeroPowerBehavior(ZeroPowerBehavior zeroPowerBehavior) { this.zeroPowerBehavior = zeroPowerBehavior; }
 
 	@Override
-	public double getPower() { return power; }
+	public double getPower() { return power * (direction == Direction.FORWARD ? 1 : -1); }
 	@Override
 	public void setPower(double power) { this.power = power; }
 	@Override

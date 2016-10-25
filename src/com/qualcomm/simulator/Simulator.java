@@ -38,7 +38,7 @@ public class Simulator {
 	public static void main(String[] args) {
 		// TODO clean up this mess
 		for (Controller c : ce.getControllers()) {
-			if (c.getType() == Type.GAMEPAD) {
+			if (c.getType() == Type.GAMEPAD || c.getType() == Type.STICK) {
 				if (controller1 == null) {
 					controller1 = c;
 				} else if (controller2 == null) {
@@ -47,11 +47,22 @@ public class Simulator {
 			}
 		}		
 		
+//		boolean a = true;
+//		while (a) {
+//			controller1.poll();
+//			for (net.java.games.input.Component c : controller1.getComponents()) {
+//				System.out.println(c.getName() + ", " + c.getIdentifier() + ": " + c.getPollData());
+//			}
+//			
+//			try { System.in.read(); } catch (IOException e) { e.printStackTrace(); }
+//		}
+		
 		// create window and simulation graphics
 		opMode = new ExampleOpMode();
 		window.repaint();
 		opMode.hardwareMap = new HardwareMap();
 		createRobot();
+		window.refreshComponents();
 		new Thread(loop()).start();
 	}
 
@@ -132,16 +143,16 @@ public class Simulator {
 		opMode.gamepad1.left_stick_button = controller1.getComponents()[8].getPollData() == 1f;
 		opMode.gamepad1.right_stick_button = controller1.getComponents()[9].getPollData() == 1f;
 
-		float hat = controller1.getComponents()[10].getPollData();
+		float hat = controller1.getComponents()[2].getPollData();
 		opMode.gamepad1.dpad_left = hat == .875f || hat == 1f || hat == .125f;
 		opMode.gamepad1.dpad_right = hat == .375f || hat == .5f || hat == .675f;
 		opMode.gamepad1.dpad_up = hat == .125f || hat == .25f || hat == .375f;
 		opMode.gamepad1.dpad_down = hat == .675f || hat == .75f || hat == .875f;
 		
-		opMode.gamepad1.left_stick_x = controller1.getComponent(Identifier.Axis.X).getPollData() * -1;
-		opMode.gamepad1.left_stick_y = controller1.getComponent(Identifier.Axis.Y).getPollData();
-		opMode.gamepad1.right_stick_x = controller1.getComponent(Identifier.Axis.RX).getPollData() * -1;
-		opMode.gamepad1.right_stick_y = controller1.getComponent(Identifier.Axis.RY).getPollData();
+		opMode.gamepad1.left_stick_x = controller1.getComponent(Identifier.Axis.X).getPollData();
+		opMode.gamepad1.left_stick_y = controller1.getComponent(Identifier.Axis.Y).getPollData() * -1;
+		opMode.gamepad1.right_stick_x = controller1.getComponent(Identifier.Axis.RX).getPollData();
+		opMode.gamepad1.right_stick_y = controller1.getComponent(Identifier.Axis.RY).getPollData() * -1;
 		
 		// TODO fix
 		opMode.gamepad1.left_trigger = controller1.getComponent(Identifier.Axis.Z).getPollData();
