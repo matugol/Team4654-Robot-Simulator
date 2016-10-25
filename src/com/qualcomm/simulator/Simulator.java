@@ -15,7 +15,7 @@ import net.java.games.input.Controller.Type;
 public class Simulator {
 
 	private static OpMode opMode;
-	private static ArrayList<Component> robot = new ArrayList<Component>();
+	private static ArrayList<RobotComponent> robot = new ArrayList<RobotComponent>();
 	private static float robotX = 72, robotY = 72, robotRotation = 90;
 	private static ArrayList<SimMotor> leftWheels = new ArrayList<SimMotor>(), rightWheels = new ArrayList<SimMotor>();
 
@@ -50,8 +50,9 @@ public class Simulator {
 //		boolean a = true;
 //		while (a) {
 //			controller1.poll();
-//			for (net.java.games.input.Component c : controller1.getComponents()) {
-//				System.out.println(c.getName() + ", " + c.getIdentifier() + ": " + c.getPollData());
+//			for (int i = 0; i < controller1.getComponents().length; i++) {
+//				net.java.games.input.Component c = controller1.getComponents()[i];
+//				System.out.println("[" + i + "] " + c.getName() + ", " + c.getIdentifier() + ": " + c.getPollData());
 //			}
 //			
 //			try { System.in.read(); } catch (IOException e) { e.printStackTrace(); }
@@ -132,18 +133,18 @@ public class Simulator {
 
 	private static void updateGamepads() {
 		controller1.poll();
-		opMode.gamepad1.a = controller1.getComponents()[0].getPollData() == 1f;
-		opMode.gamepad1.b = controller1.getComponents()[1].getPollData() == 1f;
-		opMode.gamepad1.x = controller1.getComponents()[2].getPollData() == 1f;
-		opMode.gamepad1.y = controller1.getComponents()[3].getPollData() == 1f;
-		opMode.gamepad1.left_bumper = controller1.getComponents()[4].getPollData() == 1f;
-		opMode.gamepad1.right_bumper = controller1.getComponents()[5].getPollData() == 1f;
-		opMode.gamepad1.back = controller1.getComponents()[6].getPollData() == 1f;
-		opMode.gamepad1.start = controller1.getComponents()[7].getPollData() == 1f; // TODO better
-		opMode.gamepad1.left_stick_button = controller1.getComponents()[8].getPollData() == 1f;
-		opMode.gamepad1.right_stick_button = controller1.getComponents()[9].getPollData() == 1f;
+		opMode.gamepad1.a = controller1.getComponents()[5].getPollData() == 1f;
+		opMode.gamepad1.b = controller1.getComponents()[6].getPollData() == 1f;
+		opMode.gamepad1.x = controller1.getComponents()[7].getPollData() == 1f;
+		opMode.gamepad1.y = controller1.getComponents()[8].getPollData() == 1f;
+		opMode.gamepad1.left_bumper = controller1.getComponents()[9].getPollData() == 1f;
+		opMode.gamepad1.right_bumper = controller1.getComponents()[10].getPollData() == 1f;
+		opMode.gamepad1.back = controller1.getComponents()[11].getPollData() == 1f;
+		opMode.gamepad1.start = controller1.getComponents()[12].getPollData() == 1f; // TODO better
+		opMode.gamepad1.left_stick_button = controller1.getComponents()[13].getPollData() == 1f;
+		opMode.gamepad1.right_stick_button = controller1.getComponents()[14].getPollData() == 1f;
 
-		float hat = controller1.getComponents()[2].getPollData();
+		float hat = controller1.getComponents()[15].getPollData();
 		opMode.gamepad1.dpad_left = hat == .875f || hat == 1f || hat == .125f;
 		opMode.gamepad1.dpad_right = hat == .375f || hat == .5f || hat == .675f;
 		opMode.gamepad1.dpad_up = hat == .125f || hat == .25f || hat == .375f;
@@ -171,12 +172,14 @@ public class Simulator {
 		}
 		//rightAverage /= rightWheels.size();
 
+		//System.out.println(leftAverage + ", " + rightAverage);
+		
 		// TODO Movement calculations
-		robotRotation += (leftAverage - rightAverage) * 30f * timeStep;
+		robotRotation += (rightAverage - leftAverage) * 300f * timeStep;
 		while (robotRotation >= 360f) robotRotation -= 360f;
 		while (robotRotation < 0f) robotRotation += 360;
 		
-		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 21.5f * timeStep);
+		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 201.5f * timeStep);
 		robotX += (float) (distance * Math.cos(Math.toRadians(robotRotation)));
 		robotY -= (float) (distance * Math.sin(Math.toRadians(robotRotation)));
 		
@@ -217,7 +220,7 @@ public class Simulator {
 		return false;
 	}
 
-	public static ArrayList<Component> getRobot() { return robot; }
+	public static ArrayList<RobotComponent> getRobot() { return robot; }
 	public static float getRobotX() { return robotX; }
 	public static float getRobotY() { return robotY; }
 	public static float getRobotRotation() { return robotRotation; }

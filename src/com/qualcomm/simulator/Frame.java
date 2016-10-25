@@ -4,7 +4,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
-public class Frame implements Component {
+public class Frame implements RobotComponent {
 
 	private Color color;
 	private float x, y, width, height, rotation;

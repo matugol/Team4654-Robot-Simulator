@@ -9,7 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.DcMotor.Direction;
 
-public class SimMotor implements Component, DcMotor {
+public class SimMotor implements RobotComponent, DcMotor {
 
 	private float x, y, rotation;
 	

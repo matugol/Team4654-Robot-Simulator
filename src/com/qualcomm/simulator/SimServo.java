@@ -5,7 +5,7 @@ import java.awt.image.BufferedImage;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 
-public class SimServo implements Component, Servo {
+public class SimServo implements RobotComponent, Servo {
 
 	private float x, y, rotation;
 	private float realPosition;

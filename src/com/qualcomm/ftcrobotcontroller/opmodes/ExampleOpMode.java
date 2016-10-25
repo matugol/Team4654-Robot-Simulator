@@ -42,8 +42,8 @@ public class ExampleOpMode extends BaseOpMode {
             case DRIVE:
                 // DRIVE mode
                 // 1 control stick controls all movement directions and velocities.
-                float driveLeftPower = -driveControlStickY - driveControlStickX;
-                float driveRightPower = -driveControlStickY + driveControlStickX;
+                float driveLeftPower = -driveControlStickY + driveControlStickX;
+                float driveRightPower = -driveControlStickY - driveControlStickX;
 
                 driveLeftPower = Math.max(Math.min(1, driveLeftPower), -1);
                 driveRightPower = Math.max(Math.min(1, driveRightPower), -1);

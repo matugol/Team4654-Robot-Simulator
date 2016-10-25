@@ -1,27 +1,44 @@
 package com.qualcomm.simulator;
 
 import java.awt.Component;
-import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.LayoutManager;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JPanel;
 
-import com.sun.org.apache.bcel.internal.generic.NEW;
-
 public class Window extends JFrame {
+
+	private static final long serialVersionUID = -410931336559141265L;
 
 	public static final int scale = 5; // pixels per inch
 	private static World world;
 	
-	private static JList<com.qualcomm.simulator.Component> components = new JList<>();
+	private static JList<RobotComponent> components = new JList<>();
+	static {
+		components.setCellRenderer(new DefaultListCellRenderer() {
+
+			private static final long serialVersionUID = -2242260940827460562L;
+			
+			@Override
+			public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+				Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+				
+				if (!(value instanceof RobotComponent)) return c;
+				RobotComponent robotComponent = (RobotComponent) value;
+				
+				return c;
+			}
+
+			
+		});
+	}
 	
 	public Window() {
 		super("Team4654 Robot Simulator");
@@ -43,18 +60,20 @@ public class Window extends JFrame {
 	}
 	
 	public void refreshComponents() {
-		com.qualcomm.simulator.Component[] temp = new com.qualcomm.simulator.Component[Simulator.getRobot().size()];
+		RobotComponent[] temp = new RobotComponent[Simulator.getRobot().size()];
 		Simulator.getRobot().toArray(temp);
 		components.setListData(temp);
 	}
 	
 	private class World extends JPanel {
 	
+		private static final long serialVersionUID = -7276267169741993849L;
+
 		public void paint(Graphics g) {	  
 			Graphics2D gg = (Graphics2D) g;
 		    BufferedImage robot = new BufferedImage(18 * scale, 18 * scale, BufferedImage.TYPE_INT_ARGB_PRE);
 		    Graphics2D robotG = robot.createGraphics();
-		    for (com.qualcomm.simulator.Component c : Simulator.getRobot()) {
+		    for (RobotComponent c : Simulator.getRobot()) {
 		    	AffineTransform trans = AffineTransform.getTranslateInstance((c.getX() + 9f - c.getImage().getWidth() / scale / 2f) * scale, (c.getY() + 9f - c.getImage().getHeight() / scale / 2f) * scale);
 		    	trans.rotate(Math.toRadians(-c.getRotation()), c.getImage().getWidth() / 2f, c.getImage().getHeight() / 2f);
 		    	robotG.drawImage(c.getImage(), trans, null);
