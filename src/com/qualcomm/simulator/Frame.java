@@ -1,16 +1,22 @@
 package com.qualcomm.simulator;
 
 import java.awt.Color;
+import java.awt.Container;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
+import javax.swing.JLabel;
+
 public class Frame implements RobotComponent {
 
+	private String name;
 	private Color color;
 	private float x, y, width, height, rotation;
 	private BufferedImage image;
 	
-	public Frame(Color color, float x, float y, float width, float height, float rotation) {
+	public Frame(Color color, float x, float y, float width, float height, float rotation, String name) {
+		this.name = name;
+		
 		this.color = color;
 		this.x = x;
 		this.y = y;
@@ -23,10 +29,25 @@ public class Frame implements RobotComponent {
 		g.setColor(color);
 		g.fillRect(0, 0, Math.round(width * Window.scale), Math.round(height * Window.scale));
 	}
-
+	
+	@Override
+	public String toString() {
+		return name;
+	}
+	
+	@Override
+	public Container getInfoBox() {
+		return RobotComponent.createInfoBox(this);
+	}
+	
 	@Override
 	public BufferedImage getImage() {
 		return image;
+	}
+	
+	@Override
+	public String getName() {
+		return this.name;
 	}
 
 	@Override

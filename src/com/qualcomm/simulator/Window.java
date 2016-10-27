@@ -1,8 +1,8 @@
 package com.qualcomm.simulator;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
@@ -12,6 +12,7 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 
 public class Window extends JFrame {
 
@@ -33,7 +34,7 @@ public class Window extends JFrame {
 				if (!(value instanceof RobotComponent)) return c;
 				RobotComponent robotComponent = (RobotComponent) value;
 				
-				return c;
+				return robotComponent.getInfoBox();
 			}
 
 			
@@ -44,13 +45,13 @@ public class Window extends JFrame {
 		super("Team4654 Robot Simulator");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-		setLayout(new FlowLayout());
+		setLayout(new BorderLayout());
 		
 		world = new World();
 		world.setPreferredSize(new Dimension(12 * 12 * scale, 12 * 12 * scale));
 		add(world);
 		components.setPreferredSize(new Dimension(250, 12 * 12 * scale));
-		add(components);
+		add(new JScrollPane(components), BorderLayout.LINE_END);
 		
 		//setIgnoreRepaint(true);
 		setResizable(false);
@@ -60,9 +61,8 @@ public class Window extends JFrame {
 	}
 	
 	public void refreshComponents() {
-		RobotComponent[] temp = new RobotComponent[Simulator.getRobot().size()];
-		Simulator.getRobot().toArray(temp);
-		components.setListData(temp);
+		components.setListData(Simulator.getRobot().toArray(new RobotComponent[Simulator.getRobot().size()]));
+//		components.setListData(new RobotComponent[] {null, null, null, null});
 	}
 	
 	private class World extends JPanel {

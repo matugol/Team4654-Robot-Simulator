@@ -68,7 +68,7 @@ public class Simulator {
 	}
 
 	private static void createRobot() {		
-		robot.add(new Frame(Color.LIGHT_GRAY, 0f, 0f, 18f, 18f, 0f));
+		robot.add(new Frame(Color.LIGHT_GRAY, 0f, 0f, 18f, 18f, 0f, "Base"));
 
 		robot.add(new SimMotor(-7f, 7f, 0f, "leftfront", opMode.hardwareMap));
 		leftWheels.add((SimMotor) robot.get(1));
@@ -175,11 +175,11 @@ public class Simulator {
 		//System.out.println(leftAverage + ", " + rightAverage);
 		
 		// TODO Movement calculations
-		robotRotation += (rightAverage - leftAverage) * 300f * timeStep;
+		robotRotation += (rightAverage - leftAverage) * 30f * timeStep;
 		while (robotRotation >= 360f) robotRotation -= 360f;
 		while (robotRotation < 0f) robotRotation += 360;
 		
-		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 201.5f * timeStep);
+		float distance = (float) ((leftAverage + rightAverage) / (leftWheels.size() + rightWheels.size()) * 21.5f * timeStep);
 		robotX += (float) (distance * Math.cos(Math.toRadians(robotRotation)));
 		robotY -= (float) (distance * Math.sin(Math.toRadians(robotRotation)));
 		
