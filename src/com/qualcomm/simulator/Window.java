@@ -1,10 +1,12 @@
 package com.qualcomm.simulator;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 
@@ -13,16 +15,26 @@ import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
+import javax.swing.SwingUtilities;
 
 public class Window extends JFrame {
 
 	private static final long serialVersionUID = -410931336559141265L;
 
 	// public static final int scale = 5; // pixels per inch
-	private static World world = new World();
+	protected JPanel world = new World();
 
-	private static JList<RobotComponent> components = new JList<>();
-	static {
+	private final JList<RobotComponent> components;
+
+	public Window() {
+		super("Team4654 Robot Simulator");
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+		setLayout(new BorderLayout());
+
+		world = new World();
+
+		components = new JList<>();
 		components.setCellRenderer(new DefaultListCellRenderer() {
 
 			private static final long serialVersionUID = -2242260940827460562L;
@@ -38,19 +50,13 @@ public class Window extends JFrame {
 			}
 
 		});
-	}
 
-	public Window() {
-		super("Team4654 Robot Simulator");
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-		setLayout(new BorderLayout());
-
-		world = new World();
 // world.setPreferredSize(new Dimension(12 * 12 * scale, 12 * 12 * scale));
 // components.setPreferredSize(new Dimension(250, 12 * 12 * scale));
 
 		final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, world, components);
+		splitPane.setDividerLocation(Toolkit.getDefaultToolkit().getScreenSize().width - 250);
+		splitPane.setDividerSize(4);
 		add(splitPane);
 
 		setSize(640, 480);
@@ -58,7 +64,10 @@ public class Window extends JFrame {
 
 		// setIgnoreRepaint(true);
 		// setSize(new Dimension(12 * 12 * scale, 12 * 12 * scale));
-		setVisible(true);
+		SwingUtilities.invokeLater(() -> {
+			setVisible(true);
+			repaint();
+		});
 	}
 
 	public void refreshComponents() {
@@ -100,12 +109,14 @@ public class Window extends JFrame {
 			robotG.drawLine(6 * RobotComponent.IMAGE_SCALE, 18 * RobotComponent.IMAGE_SCALE, 9 * RobotComponent.IMAGE_SCALE, 0);
 			robotG.drawLine(13 * RobotComponent.IMAGE_SCALE, 18 * RobotComponent.IMAGE_SCALE, 9 * RobotComponent.IMAGE_SCALE, 0);
 
-			final AffineTransform trans = AffineTransform.getTranslateInstance(dx + Simulator.getRobotX() * scale, dy + Simulator.getRobotY() * scale);
+			g.setColor(Color.GREEN);
+			g.fillRect((int) (dx + Simulator.getRobotX() * scale) - 2, (int) (dy + Simulator.getRobotY() * scale) - 2, 5, 5);
+
+			final AffineTransform trans = AffineTransform.getTranslateInstance(dx + (Simulator.getRobotX() - 9) * scale, dy + (Simulator.getRobotY() - 9) * scale);
 			trans.scale(scale / RobotComponent.IMAGE_SCALE, scale / RobotComponent.IMAGE_SCALE);
 			trans.rotate(Math.toRadians(-Simulator.getRobotRotation() + 90), robot.getWidth() / 2f, robot.getHeight() / 2f);
 			g.drawImage(robot, trans, null);
 		}
-
 	}
 
 }

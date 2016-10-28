@@ -3,6 +3,8 @@ package com.qualcomm.simulator;
 import java.awt.Color;
 import java.util.ArrayList;
 
+import javax.swing.JComponent;
+
 import net.java.games.input.Controller;
 import net.java.games.input.Controller.Type;
 import net.java.games.input.ControllerEnvironment;
@@ -26,13 +28,19 @@ public class Simulator {
 	private static final ControllerEnvironment CONTROLLER_ENVIONMENT = ControllerEnvironment.getDefaultEnvironment();
 
 	private enum State {
-		DISABLED, INIT, ENABLED
+		DISABLED,
+		INIT,
+		ENABLED
 	}
 
 	private static State state = State.DISABLED;
 
 	public static void main(final String[] args) {
+		opMode = new ExampleOpMode();
+
 		// TODO clean up this mess
+		opMode.gamepad1 = new SimGamepad();
+		((SimGamepad) opMode.gamepad1).configure(window.world, window.world.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW), window.world.getActionMap());
 		for (final Controller c : CONTROLLER_ENVIONMENT.getControllers()) {
 			if (c.getType() == Type.GAMEPAD || c.getType() == Type.STICK) {
 				if (opMode.gamepad1 == null) {
@@ -55,12 +63,10 @@ public class Simulator {
 // }
 
 		// create window and simulation graphics
-		opMode = new ExampleOpMode();
-		window.repaint();
 		opMode.hardwareMap = new HardwareMap();
 		createRobot();
 		window.refreshComponents();
-		new Thread(loop()).start();
+		new Thread(LOOP).start();
 	}
 
 	private static void createRobot() {
@@ -78,32 +84,30 @@ public class Simulator {
 		init();
 	}
 
-	private static Runnable loop() {
-		return () -> {
-			long deltaTime, currentTime, previousTime = System.nanoTime(), deltaSecond, previousSecond = System.nanoTime();
-			int fpsCount = 0;
+	private static final Runnable LOOP = () -> {
+		long deltaTime, currentTime, previousTime = System.nanoTime(), deltaSecond, previousSecond = System.nanoTime();
+		int fpsCount = 0;
 
-			while (true) {
+		while (true) {
+			currentTime = System.nanoTime();
+			deltaTime = currentTime - previousTime;
+
+			if (deltaTime >= 1000000000 / TARGET_FPS) {
+				previousTime = currentTime;
+				fpsCount++;
+				fixedUpdate();
+
 				currentTime = System.nanoTime();
-				deltaTime = currentTime - previousTime;
+				deltaSecond = currentTime - previousSecond;
 
-				if (deltaTime >= 1000000000 / TARGET_FPS) {
-					previousTime = currentTime;
-					fpsCount++;
-					fixedUpdate();
-
-					currentTime = System.nanoTime();
-					deltaSecond = currentTime - previousSecond;
-
-					if (deltaSecond >= 1000000000) {
-						setCurrentFPS(fpsCount / (deltaSecond / 1000000000));
-						previousSecond = currentTime;
-						fpsCount = 0;
-					}
+				if (deltaSecond >= 1000000000) {
+					setCurrentFPS(fpsCount / (deltaSecond / 1000000000));
+					previousSecond = currentTime;
+					fpsCount = 0;
 				}
 			}
-		};
-	}
+		}
+	};
 
 	private static void fixedUpdate() { // Update always advances (1 / targetFPS) of a second
 		worldUpdate(1d / TARGET_FPS);
@@ -125,7 +129,7 @@ public class Simulator {
 
 	private static void updateGamepads() {
 		if (opMode.gamepad1 != null) opMode.gamepad1.update();
-		if (opMode.gamepad2 != null) opMode.gamepad1.update();
+		if (opMode.gamepad2 != null) opMode.gamepad2.update();
 
 // controller1.poll();
 // opMode.gamepad1.a = controller1.getComponents()[5].getPollData() == 1f;
